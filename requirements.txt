@@ -3,3 +3,5 @@ twilio
 python-dotenv
 fastapi
 uvicorn
+numpy
+pillow
