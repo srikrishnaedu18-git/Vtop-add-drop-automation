@@ -64,8 +64,9 @@ python main.py
 
 ### View DB Seat History
 ```bash
-python show_db.py
+python tools/show_db.py
 ```
+
 
 ---
 

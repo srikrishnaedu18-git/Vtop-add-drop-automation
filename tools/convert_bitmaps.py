@@ -7,7 +7,11 @@ Run once: venv/bin/python3 convert_bitmaps.py
 """
 import re, json, pathlib
 
-src = pathlib.Path("bitmaps.js").read_text()
+BASE_DIR = pathlib.Path(__file__).parent.parent.absolute()
+src_file = BASE_DIR / "reference" / "bitmaps.js"
+out_file = BASE_DIR / "src" / "bitmaps.py"
+
+src = src_file.read_text()
 
 src = src.strip()
 src = re.sub(r'^const bitmaps\s*=\s*', '', src)
@@ -43,5 +47,6 @@ out_lines.append("}\n\n")
 out_lines.append(f"NN_WEIGHTS = {repr(data['weights'])}\n\n")
 out_lines.append(f"NN_BIASES = {repr(data['biases'])}\n")
 
-pathlib.Path("bitmaps.py").write_text("".join(out_lines))
-print("Written to bitmaps.py ✓")
+out_file.write_text("".join(out_lines))
+print("Written to src/bitmaps.py ✓")
+

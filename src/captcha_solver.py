@@ -15,7 +15,14 @@ import io
 import math
 import numpy as np
 from PIL import Image
-from bitmaps import NN_WEIGHTS, NN_BIASES
+try:
+    from src.bitmaps import NN_WEIGHTS, NN_BIASES
+except ImportError:
+    try:
+        from bitmaps import NN_WEIGHTS, NN_BIASES
+    except ImportError:
+        from .bitmaps import NN_WEIGHTS, NN_BIASES
+
 
 # Characters the NN was trained on (must match ViBoot's label_txt)
 LABEL_TXT = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

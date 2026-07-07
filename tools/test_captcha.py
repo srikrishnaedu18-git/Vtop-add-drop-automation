@@ -12,22 +12,26 @@ After running, open the saved .jpg files and compare against the
 printed solver output. Match = ✅ working. Mismatch = ❌ needs tuning.
 """
 
+import sys
+import os
 import asyncio
 import base64
-import os
-import sys
 import argparse
 from datetime import datetime
+from playwright.async_api import async_playwright
 
-# ── Load .env if python-dotenv is installed (optional) ────────────────────────
+# Add parent directory to sys.path to find src/ package
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Load .env if python-dotenv is installed (optional)
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # python-dotenv not installed — fall back to defaults
+    pass
 
-from playwright.async_api import async_playwright
-from captcha_solver import solve_captcha_b64
+from src.captcha_solver import solve_captcha_b64
+
 
 BASE_URL    = os.getenv("BASE_URL",    "https://vtopreg.vit.ac.in/tablet/")
 CHROME_PATH = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")

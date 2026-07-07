@@ -26,7 +26,8 @@ try:
 except ImportError:
     Client = None
 
-from captcha_solver import solve_captcha_b64
+from src.captcha_solver import solve_captcha_b64
+
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 USERNAME       = os.getenv("VTOP_USERNAME", "").strip()
@@ -590,7 +591,7 @@ async def check_and_trigger_registration(page, course_name: str, slots: list) ->
         print("  [→] Fetching OTP from Gmail (polling)...")
 
         # Import get_vtop_otp dynamically
-        from fetch_otp import get_vtop_otp
+        from src.fetch_otp import get_vtop_otp
         email_prefix, email_code = get_vtop_otp(max_wait_seconds=120, expected_prefix=screen_prefix)
 
         if not email_prefix or not email_code:

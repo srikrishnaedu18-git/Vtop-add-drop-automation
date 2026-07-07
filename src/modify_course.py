@@ -3,9 +3,17 @@ import asyncio
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 from dotenv import load_dotenv
 
-# Import functions from our other scripts
-from captcha_solver import solve_captcha_b64
-from fetch_otp import get_vtop_otp
+try:
+    from src.captcha_solver import solve_captcha_b64
+    from src.fetch_otp import get_vtop_otp
+except ImportError:
+    try:
+        from captcha_solver import solve_captcha_b64
+        from fetch_otp import get_vtop_otp
+    except ImportError:
+        from .captcha_solver import solve_captcha_b64
+        from .fetch_otp import get_vtop_otp
+
 
 load_dotenv()
 
