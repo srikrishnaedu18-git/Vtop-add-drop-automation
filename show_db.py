@@ -1,5 +1,4 @@
 import sqlite3
-import json
 import os
 from datetime import datetime
 
@@ -21,16 +20,16 @@ def main():
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='scrapes'")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='seat_logs'")
         if not cursor.fetchone():
-            print("Table 'scrapes' does not exist in the database yet.")
+            print("Table 'seat_logs' does not exist in the database yet.")
             return
 
         cursor.execute("""
-            SELECT id, timestamp, changed, course_name, slots_json 
-            FROM scrapes 
+            SELECT id, timestamp, course_name, slot, faculty, available, changed 
+            FROM seat_logs 
             ORDER BY timestamp DESC 
-            LIMIT 40
+            LIMIT 60
         """)
         rows = cursor.fetchall()
     except Exception as e:
@@ -43,38 +42,25 @@ def main():
         print("Database is currently empty.")
         return
 
-    print("\n" + "=" * 100)
-    print(f"{'ID':<4} | {'TIMESTAMP':<24} | {'CHANGE?':<7} | {'COURSE':<35} | {'SLOTS SUMMARY':<20}")
-    print("-" * 100)
+    print("\n" + "=" * 115)
+    print(f"{'ID':<6} | {'TIMESTAMP':<24} | {'COURSE':<25} | {'SLOT':<8} | {'FACULTY':<25} | {'AVAILABLE':<9} | {'CHANGED?':<8}")
+    print("-" * 115)
 
     for row in rows:
-        db_id, timestamp, changed, course_name, slots_json = row
+        db_id, timestamp, course_name, slot, faculty, available, changed = row
         
-        changed_str = "YES 🔔" if changed else "NO (hb)"
+        changed_str = "YES 🔔" if changed else "NO"
         
-        # Parse slots summary
-        summary = "-"
-        if slots_json:
-            try:
-                slots = json.loads(slots_json)
-                parts = []
-                for s in slots:
-                    avail = s.get("available", "0")
-                    parts.append(f"{s.get('slot')}:{avail}")
-                summary = ", ".join(parts)
-            except:
-                summary = "Error parsing slots"
-        
-        # Truncate summary if too long
-        if len(summary) > 40:
-            summary = summary[:37] + "..."
-
         course_display = course_name or "Unknown"
-        if len(course_display) > 35:
-            course_display = course_display[:32] + "..."
+        if len(course_display) > 25:
+            course_display = course_display[:22] + "..."
 
-        print(f"{db_id:<4} | {format_timestamp(timestamp):<24} | {changed_str:<7} | {course_display:<35} | {summary}")
-    print("=" * 100 + "\n")
+        faculty_display = faculty or "Unknown"
+        if len(faculty_display) > 25:
+            faculty_display = faculty_display[:22] + "..."
+
+        print(f"{db_id:<6} | {format_timestamp(timestamp):<24} | {course_display:<25} | {slot:<8} | {faculty_display:<25} | {available:<9} | {changed_str:<8}")
+    print("=" * 115 + "\n")
 
 if __name__ == "__main__":
     main()

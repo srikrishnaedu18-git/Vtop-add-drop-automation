@@ -55,53 +55,76 @@ MY_PHONE_NUMBER    = os.getenv("MY_PHONE_NUMBER", "").strip()
 # ─── Database ─────────────────────────────────────────────────────────────────
 
 def init_db():
-    """Create the scrapes table if it doesn't exist."""
+    """Create the seat_logs table if it doesn't exist."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute('''
-            CREATE TABLE IF NOT EXISTS scrapes (
+            CREATE TABLE IF NOT EXISTS seat_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                changed BOOLEAN,
                 course_name TEXT,
-                slots_json TEXT
+                slot TEXT,
+                faculty TEXT,
+                available TEXT,
+                changed BOOLEAN
             )
         ''')
 
 
 def check_and_save_db(course_name: str, slots: list) -> bool:
     """
-    Checks if the scraped slots match the last changed state in the DB.
-    Inserts a new heartbeat row (changed=0) if identical.
-    Inserts a new data row (changed=1) if different.
-    Returns True if changed, False otherwise.
+    Saves each scraped slot to seat_logs according to transition rules.
+    Returns True if ANY slot underwent a changed state transition (changed=True),
+    which signals that we should trigger a WhatsApp alert.
     """
-    current_json = json.dumps(slots, sort_keys=True)
+    has_any_change = False
     
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         
-        # Get the JSON of the last time this course's slots actually changed
-        cursor.execute('''
-            SELECT slots_json FROM scrapes 
-            WHERE changed = 1 AND course_name = ? 
-            ORDER BY timestamp DESC LIMIT 1
-        ''', (course_name,))
-        row = cursor.fetchone()
-        
-        if row and row[0] == current_json:
-            # Data is identical to the last known state -> insert heartbeat
+        for s in slots:
+            slot_name = s["slot"]
+            faculty = s["faculty"]
+            avail = s["available"]
+            
+            # Fetch the most recent log for this course/slot/faculty
             cursor.execute('''
-                INSERT INTO scrapes (changed, course_name, slots_json)
-                VALUES (0, ?, NULL)
-            ''', (course_name,))
-            return False
-        else:
-            # Data is new or changed -> save the full json
-            cursor.execute('''
-                INSERT INTO scrapes (changed, course_name, slots_json)
-                VALUES (1, ?, ?)
-            ''', (course_name, current_json))
-            return True
+                SELECT available FROM seat_logs 
+                WHERE course_name = ? AND slot = ? AND faculty = ? 
+                ORDER BY timestamp DESC LIMIT 1
+            ''', (course_name, slot_name, faculty))
+            row = cursor.fetchone()
+            
+            is_number = avail.lower() not in ("full", "0", "-")
+            
+            if row is None:
+                # First time seeing this slot
+                cursor.execute('''
+                    INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
+                    VALUES (?, ?, ?, ?, 1)
+                ''', (course_name, slot_name, faculty, avail))
+                has_any_change = True
+            else:
+                last_avail = row[0]
+                if avail != last_avail:
+                    # Transition occurred
+                    cursor.execute('''
+                        INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
+                        VALUES (?, ?, ?, ?, 1)
+                    ''', (course_name, slot_name, faculty, avail))
+                    has_any_change = True
+                else:
+                    # No transition
+                    if is_number:
+                        # Log it anyway to track history, but with changed=0
+                        cursor.execute('''
+                            INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
+                            VALUES (?, ?, ?, ?, 0)
+                        ''', (course_name, slot_name, faculty, avail))
+                    else:
+                        # "full" with no transition -> skip inserting to prevent bloat
+                        pass
+                        
+    return has_any_change
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
