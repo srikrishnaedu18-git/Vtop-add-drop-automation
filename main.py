@@ -37,6 +37,12 @@ HEADLESS       = os.getenv("HEADLESS", "false").lower() == "true"
 MAX_RETRIES    = 8
 DB_PATH        = os.getenv("DB_PATH", "seats.db").strip()
 MONITOR_DELAY_SECONDS = int(os.getenv("MONITOR_DELAY_SECONDS", "30"))
+REGISTER       = os.getenv("REGISTER", os.getenv("REGISTER_ENABLED", "false")).lower() == "true"
+MODIFY         = os.getenv("MODIFY", os.getenv("MODIFY_ENABLED", "false")).lower() == "true"
+CHOSEN_FACULTY = os.getenv("CHOSEN_FACULTY", "").strip()
+CHOSEN_SLOT    = os.getenv("CHOSEN_SLOT", "").strip()
+
+
 
 # Add more dictionaries here to scrape multiple subjects sequentially!
 try:
@@ -446,6 +452,187 @@ def send_whatsapp_alert(msg_text: str):
         print(f"\n[✗] Failed to send WhatsApp Alert: {e}")
 
 
+async def check_and_trigger_registration(page, course_name: str, slots: list) -> bool:
+    """
+    Checks if REGISTER or MODIFY is enabled and if the CHOSEN_FACULTY has an available slot.
+    If so, performs the automated registration/modification.
+    Returns True if an automated action was successfully triggered (which should stop the script).
+    """
+    if not (REGISTER or MODIFY) or not CHOSEN_FACULTY:
+        return False
+
+    print(f"\n[Automator] Checking if '{CHOSEN_FACULTY}'" + (f" on slot '{CHOSEN_SLOT}'" if CHOSEN_SLOT else "") + " is available for automated action...")
+    target_slot = None
+    for s in slots:
+        fac_match = CHOSEN_FACULTY.lower() in s["faculty"].lower()
+        slot_match = True
+        if CHOSEN_SLOT:
+            slot_match = CHOSEN_SLOT.lower() in s["slot"].lower()
+        
+        if fac_match and slot_match:
+            avail_str = s["available"].lower()
+            if avail_str not in ("full", "0", "-"):
+                target_slot = s
+                break
+
+    if not target_slot:
+        print(f"  [i] '{CHOSEN_FACULTY}'" + (f" on slot '{CHOSEN_SLOT}'" if CHOSEN_SLOT else "") + " is not available/full. Continuing monitoring.")
+        return False
+
+    print(f"\n🚀 [AUTOMATOR TRIGGERED] Found available slot for '{CHOSEN_FACULTY}' ({target_slot['available']} seats)!")
+
+    # 1. Locate and click the slot radio button
+    rows = await page.locator("#page-wrapper table tbody tr").all()
+    target_row = None
+    radio_locator = None
+
+    for r in rows:
+        inner_text = await r.inner_text()
+        fac_match = CHOSEN_FACULTY.lower() in inner_text.lower()
+        slot_match = True
+        if CHOSEN_SLOT:
+            slot_match = CHOSEN_SLOT.lower() in inner_text.lower()
+
+        if fac_match and slot_match:
+            # Check for radio button inside this row
+            # If MODIFY is enabled, name is courseOption (lowercase o)
+            # If REGISTER is enabled, name is classnbr1
+            radio_name = "courseOption" if MODIFY else "classnbr1"
+            radio = r.locator(f"input[type='radio'][name='{radio_name}']")
+            if await radio.count() > 0:
+                target_row = r
+                radio_locator = radio
+                break
+
+
+    if not radio_locator:
+        print(f"  [✗] Could not find the radio button for '{CHOSEN_FACULTY}' on the page.")
+        await _dump(page, "fail_automator_radio_not_found.html")
+        return False
+
+    print(f"  [→] Clicking slot radio button for '{CHOSEN_FACULTY}'...")
+    await radio_locator.click()
+    await page.wait_for_timeout(1000)
+
+    # Wait for blockUI loader to be hidden (Ajax call filtering/updating state)
+    print("  [→] Waiting for AJAX loader/spinner to complete...")
+    try:
+        await page.locator(".blockUI").wait_for(state="hidden", timeout=10000)
+    except Exception:
+        pass
+    await page.wait_for_timeout(1000)
+
+    # 2. Flow-specific logic
+    swal_text = ""
+    if REGISTER:
+        print("  [→] REGISTER mode active. Selecting Regular (RGR) course option...")
+        # Select CourseOption RGR (Regular)
+        reg_option = page.locator("input[name='CourseOption'][value='RGR']")
+        if await reg_option.count() > 0:
+            await reg_option.click()
+            await page.wait_for_timeout(1000)
+            try:
+                await page.locator(".blockUI").wait_for(state="hidden", timeout=10000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(500)
+        else:
+            print("  [i] CourseOption radio button (RGR) not found, proceeding anyway.")
+
+        # Click Register button
+        register_btn = page.locator("button:has-text('Register')")
+        print("  [→] Clicking Register button...")
+        await register_btn.click()
+        await page.wait_for_timeout(3000)
+
+        # Handle sweetalert
+        swal = page.locator("div.sweet-alert.visible")
+        if await swal.count() > 0 and await swal.is_visible():
+            swal_text = await swal.inner_text()
+            print(f"  [VTOP Result] {swal_text}")
+            ok_btn = swal.locator("button.confirm")
+            if await ok_btn.count() > 0:
+                await ok_btn.click()
+
+        await page.screenshot(path="registration_result.png")
+
+        now_str = datetime.now().strftime("%d-%m %H:%M:%S")
+        success_msg = (
+            f"🎉 *Course Registration Successful!*\n"
+            f"📚 Course: {course_name}\n"
+            f"👤 Faculty: {target_slot['faculty']}\n"
+            f"⚡ Slot: {target_slot['slot']}\n"
+            f"🕐 Completed At: {now_str}\n"
+            f"📝 Portal response: {swal_text or 'No SweetAlert detected. Check screenshot.'}"
+        )
+        send_whatsapp_alert(success_msg)
+        print("\n[✓] Automated Registration finished. Terminating script.")
+        os._exit(0)
+
+    elif MODIFY:
+        print("  [→] MODIFY mode active. Extracting OTP reference prefix...")
+        # Extract the Prefix from the DOM
+        row = page.locator("tr:has(#mailOTP)")
+        spans = await row.locator("span").all()
+        screen_prefix = None
+        for s in spans:
+            txt = await s.inner_text()
+            if "-" in txt:
+                screen_prefix = txt.replace("-", "").strip()
+                break
+
+        if not screen_prefix:
+            print("  [✗] Could not locate OTP Reference prefix in the #mailOTP row.")
+            await _dump(page, "fail_modify_otp_prefix_not_found.html")
+            return False
+
+        print(f"  [SCREEN] OTP Prefix required: {screen_prefix}")
+        print("  [→] Fetching OTP from Gmail (polling)...")
+
+        # Import get_vtop_otp dynamically
+        from fetch_otp import get_vtop_otp
+        email_prefix, email_code = get_vtop_otp(max_wait_seconds=120, expected_prefix=screen_prefix)
+
+        if not email_prefix or not email_code:
+            print("  [✗] Failed to fetch OTP from Gmail.")
+            return False
+
+        print(f"  [✓] Prefixes Match! Filling OTP: {email_code}")
+        await page.fill("#mailOTP", email_code)
+
+        # Click the Update button
+        update_btn = page.locator("button:has-text('Update')")
+        print("  [→] Clicking Update button...")
+        await update_btn.click()
+        await page.wait_for_timeout(3000)
+
+        # Handle sweetalert
+        swal = page.locator("div.sweet-alert.visible")
+        if await swal.count() > 0 and await swal.is_visible():
+            swal_text = await swal.inner_text()
+            print(f"  [VTOP Result] {swal_text}")
+            ok_btn = swal.locator("button.confirm")
+            if await ok_btn.count() > 0:
+                await ok_btn.click()
+
+        await page.screenshot(path="modification_result.png")
+
+        now_str = datetime.now().strftime("%d-%m %H:%M:%S")
+        success_msg = (
+            f"🎉 *Course Modification Successful!*\n"
+            f"📚 Course: {course_name}\n"
+            f"👤 Faculty: {target_slot['faculty']}\n"
+            f"⚡ Slot: {target_slot['slot']}\n"
+            f"🕐 Completed At: {now_str}\n"
+            f"📝 Portal response: {swal_text or 'No SweetAlert detected. Check screenshot.'}"
+        )
+        send_whatsapp_alert(success_msg)
+        print("\n[✓] Automated Modification finished. Terminating script.")
+        os._exit(0)
+
+    return False
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 async def run():
@@ -507,8 +694,11 @@ async def run():
                                 send_whatsapp_alert(msg)
                             else:
                                 print("\n[i] Data is IDENTICAL to the last run. Stored heartbeat in DB. Not sending WhatsApp spam.")
+
+                            await check_and_trigger_registration(page, course_name, slots)
                         else:
                             print("\n[!] Could not extract slot data.")
+
 
                         # Click Go Back to return to course list page
                         print("  [→] Clicking Go Back to list page...")
@@ -566,8 +756,11 @@ async def run():
                                     send_whatsapp_alert(msg)
                                 else:
                                     print("\n[i] Data is IDENTICAL to the last run. Stored heartbeat in DB. Not sending WhatsApp spam.")
+
+                                await check_and_trigger_registration(page, course_name, slots)
                             else:
                                 print("\n[!] Could not extract slot data.")
+
 
                             print("\n[→] Returning to Home dashboard...")
                             home_btn = page.locator("#homeIcon")
