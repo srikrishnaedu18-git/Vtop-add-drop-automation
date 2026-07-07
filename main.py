@@ -369,21 +369,28 @@ async def scrape_and_format(page) -> str | None:
         f"📚 *{course_name or 'Unknown Course'}*",
         f"🕐 Scraped: {now}",
         "",
-        "```",
-        f"{'SLOT':<10} {'FACULTY':<20} {'STATUS':<8}",
-        f"{'─'*10} {'─'*20} {'─'*8}",
     ]
-    for s in slots:
-        lines.append(
-            f"{s['slot']:<10} {s['faculty']:<20} {s['available']:<8}"
-        )
-    lines.append("```")
-
+    
     avail_count = sum(1 for s in slots if s["available"].lower() not in ("full", "0", "-"))
+    
     if avail_count > 0:
-        lines.append(f"\n✅ *{avail_count} slot(s) have seats available!*")
+        lines.extend([
+            "```",
+            f"{'SLOT':<10} {'FACULTY':<20} {'STATUS':<8}",
+            f"{'─'*10} {'─'*20} {'─'*8}",
+        ])
+        for s in slots:
+            # ONLY include the row if it's NOT full
+            if s["available"].lower() not in ("full", "0", "-"):
+                lines.append(
+                    f"{s['slot']:<10} {s['faculty']:<20} {s['available']:<8}"
+                )
+        lines.extend([
+            "```",
+            f"\n✅ *{avail_count} slot(s) have seats available!*"
+        ])
     else:
-        lines.append(f"\n❌ *All slots are FULL*")
+        lines.append("❌ *All slots are FULL*")
 
     msg = "\n".join(lines)
     return msg, avail_count, course_name or "Unknown Course", slots
@@ -443,17 +450,25 @@ async def run():
                 if not await pass_progress_captcha(page): raise Exception("Progress failed")
 
                 # ── 2. Inner Continuous Monitoring Loop ──
-                while True:
-                    print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
-                    
-                    for course_config in COURSES_TO_MONITOR:
-                        print(f"\n[>] Checking {course_config['category']}: {course_config['keyword']}")
-                        
-                        if not await navigate_to_course(page, course_config):
-                            raise Exception("Failed to navigate to course. Session likely expired.")
+                if not COURSES_TO_MONITOR:
+                    print("ERROR: No courses configured in COURSES_TO_MONITOR in .env")
+                    return
 
-                        msg, avail_count, course_name, slots = await scrape_and_format(page)
-                        if msg:
+                if len(COURSES_TO_MONITOR) == 1:
+                    # ── Single Course Optimized Loop (Direct Refresh via Go Back) ──
+                    course_config = COURSES_TO_MONITOR[0]
+                    keyword = course_config["keyword"]
+
+                    print(f"[Mode] Single course detected. Optimizing refresh logic.")
+                    if not await navigate_to_course(page, course_config):
+                        raise Exception("Failed to navigate to course. Session likely expired.")
+
+                    while True:
+                        print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
+                        
+                        msg_data = await scrape_and_format(page)
+                        if msg_data:
+                            msg, avail_count, course_name, slots = msg_data
                             print("\n" + "═" * 60)
                             print("Extracted Data:\n")
                             print(msg)
@@ -470,17 +485,76 @@ async def run():
                         else:
                             print("\n[!] Could not extract slot data.")
 
-                        print("\n[→] Returning to Home dashboard...")
-                        home_btn = page.locator("#homeIcon")
-                        if await home_btn.count() > 0:
-                            await home_btn.click()
-                            # Wait for dashboard to load before starting next course
-                            await page.wait_for_timeout(2000)
-                        else:
-                            raise Exception("Home icon not found. Session must be dead.")
+                        # Click Go Back to return to course list page
+                        print("  [→] Clicking Go Back to list page...")
+                        back_btn = page.locator("button:has-text('Go Back')")
+                        await back_btn.wait_for(state="visible", timeout=10_000)
+                        await back_btn.click()
+                        
+                        # Wait for list page (Proceed button or category radios)
+                        await page.wait_for_selector("button[onclick*='viewRegistrationOption']", timeout=10_000)
+                        
+                        print(f"  [zzz] Sleeping {MONITOR_DELAY_SECONDS} seconds...")
+                        await asyncio.sleep(MONITOR_DELAY_SECONDS)
 
-                    print(f"\n[zzz] All courses checked. Sleeping {MONITOR_DELAY_SECONDS} seconds...")
-                    await asyncio.sleep(MONITOR_DELAY_SECONDS)
+                        # Click Proceed on the course again to go back to slot table
+                        print(f"  [→] Clicking Proceed for '{keyword}'...")
+                        found = False
+                        rows = await page.locator("#page-wrapper tbody tr").all()
+                        for row in rows:
+                            text = await row.inner_text()
+                            if keyword.upper() in text.upper():
+                                proceed_btn = row.locator("button:has-text('Proceed')")
+                                if await proceed_btn.count() > 0:
+                                    await proceed_btn.click()
+                                    found = True
+                                    break
+                        if not found:
+                            raise Exception("Course row not found when refreshing.")
+
+                        # Wait for slot table to load
+                        await page.wait_for_timeout(3000)
+
+                else:
+                    # ── Multi-Course Sequential Loop (Default behavior) ──
+                    while True:
+                        print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
+                        
+                        for course_config in COURSES_TO_MONITOR:
+                            print(f"\n[>] Checking {course_config['category']}: {course_config['keyword']}")
+                            
+                            if not await navigate_to_course(page, course_config):
+                                raise Exception("Failed to navigate to course. Session likely expired.")
+
+                            msg_data = await scrape_and_format(page)
+                            if msg_data:
+                                msg, avail_count, course_name, slots = msg_data
+                                print("\n" + "═" * 60)
+                                print("Extracted Data:\n")
+                                print(msg)
+                                print("\n" + "═" * 60)
+
+                                init_db()
+                                is_changed = check_and_save_db(course_name, slots)
+
+                                if is_changed:
+                                    print("\n[!] Data CHANGED since last run! Triggering WhatsApp API...")
+                                    send_whatsapp_alert(msg)
+                                else:
+                                    print("\n[i] Data is IDENTICAL to the last run. Stored heartbeat in DB. Not sending WhatsApp spam.")
+                            else:
+                                print("\n[!] Could not extract slot data.")
+
+                            print("\n[→] Returning to Home dashboard...")
+                            home_btn = page.locator("#homeIcon")
+                            if await home_btn.count() > 0:
+                                await home_btn.click()
+                                await page.wait_for_timeout(2000)
+                            else:
+                                raise Exception("Home icon not found. Session must be dead.")
+
+                        print(f"\n[zzz] All courses checked. Sleeping {MONITOR_DELAY_SECONDS} seconds...")
+                        await asyncio.sleep(MONITOR_DELAY_SECONDS)
 
             except Exception as e:
                 print(f"\n[!] Session crashed or expired: {e}")
