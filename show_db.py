@@ -7,7 +7,7 @@ DB_PATH = "seats.db"
 def format_timestamp(ts_str):
     try:
         dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-        return dt.strftime("%d-%b %Y %I:%M:%S %p")
+        return dt.strftime("%d-%m %H:%M:%S")
     except:
         return ts_str
 

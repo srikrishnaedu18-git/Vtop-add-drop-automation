@@ -17,7 +17,7 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=True)
 except ImportError:
     pass
 
@@ -77,6 +77,7 @@ def check_and_save_db(course_name: str, slots: list) -> bool:
     which signals that we should trigger a WhatsApp alert.
     """
     has_any_change = False
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -99,27 +100,27 @@ def check_and_save_db(course_name: str, slots: list) -> bool:
             if row is None:
                 # First time seeing this slot
                 cursor.execute('''
-                    INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
-                    VALUES (?, ?, ?, ?, 1)
-                ''', (course_name, slot_name, faculty, avail))
+                    INSERT INTO seat_logs (timestamp, course_name, slot, faculty, available, changed)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                ''', (now_str, course_name, slot_name, faculty, avail))
                 has_any_change = True
             else:
                 last_avail = row[0]
                 if avail != last_avail:
                     # Transition occurred
                     cursor.execute('''
-                        INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
-                        VALUES (?, ?, ?, ?, 1)
-                    ''', (course_name, slot_name, faculty, avail))
+                        INSERT INTO seat_logs (timestamp, course_name, slot, faculty, available, changed)
+                        VALUES (?, ?, ?, ?, ?, 1)
+                    ''', (now_str, course_name, slot_name, faculty, avail))
                     has_any_change = True
                 else:
                     # No transition
                     if is_number:
                         # Log it anyway to track history, but with changed=0
                         cursor.execute('''
-                            INSERT INTO seat_logs (course_name, slot, faculty, available, changed)
-                            VALUES (?, ?, ?, ?, 0)
-                        ''', (course_name, slot_name, faculty, avail))
+                            INSERT INTO seat_logs (timestamp, course_name, slot, faculty, available, changed)
+                            VALUES (?, ?, ?, ?, ?, 0)
+                        ''', (now_str, course_name, slot_name, faculty, avail))
                     else:
                         # "full" with no transition -> skip inserting to prevent bloat
                         pass
@@ -387,7 +388,7 @@ async def scrape_and_format(page) -> str | None:
         return None
 
     # ── Format WhatsApp message ──
-    now = datetime.now().strftime("%d-%b-%Y %I:%M %p")
+    now = datetime.now().strftime("%d-%m %H:%M:%S")
     lines = [
         f"📚 *{course_name or 'Unknown Course'}*",
         f"🕐 Scraped: {now}",
@@ -481,6 +482,7 @@ async def run():
                     # ── Single Course Optimized Loop (Direct Refresh via Go Back) ──
                     course_config = COURSES_TO_MONITOR[0]
                     keyword = course_config["keyword"]
+                    pg_num = str(course_config.get("page", 1))
 
                     print(f"[Mode] Single course detected. Optimizing refresh logic.")
                     if not await navigate_to_course(page, course_config):
@@ -514,26 +516,25 @@ async def run():
                         await back_btn.wait_for(state="visible", timeout=10_000)
                         await back_btn.click()
                         
-                        # Wait for list page (Proceed button or category radios)
-                        await page.wait_for_selector("button[onclick*='viewRegistrationOption']", timeout=10_000)
+                        # Wait for list page (Proceed button to be attached in DOM)
+                        await page.wait_for_selector("button:has-text('Proceed')", state="attached", timeout=10_000)
+                        
+                        # VTOP might default back to Page 1, so if pg_num is not 1, we manually force-switch page
+                        if pg_num != "1":
+                            print(f"  [→] Forcing switch to Page {pg_num}...")
+                            await page.evaluate(f"getResults2('10','{pg_num}','0','NONE','2')")
+                            await page.wait_for_timeout(1000)
+                        
+                        # Now wait for the specific course's Proceed button to be visible
+                        target_btn = page.locator(f"tr:has-text('{keyword}') button:has-text('Proceed')")
+                        await target_btn.wait_for(state="visible", timeout=10_000)
                         
                         print(f"  [zzz] Sleeping {MONITOR_DELAY_SECONDS} seconds...")
                         await asyncio.sleep(MONITOR_DELAY_SECONDS)
 
                         # Click Proceed on the course again to go back to slot table
                         print(f"  [→] Clicking Proceed for '{keyword}'...")
-                        found = False
-                        rows = await page.locator("#page-wrapper tbody tr").all()
-                        for row in rows:
-                            text = await row.inner_text()
-                            if keyword.upper() in text.upper():
-                                proceed_btn = row.locator("button:has-text('Proceed')")
-                                if await proceed_btn.count() > 0:
-                                    await proceed_btn.click()
-                                    found = True
-                                    break
-                        if not found:
-                            raise Exception("Course row not found when refreshing.")
+                        await target_btn.click()
 
                         # Wait for slot table to load
                         await page.wait_for_timeout(3000)
