@@ -31,4 +31,4 @@ services:
       - key: print_scrapper_data_in_terminal
         value: "false"
       - key: MONITOR_DELAY_SECONDS
-        value: "30"
+        value: "5"
