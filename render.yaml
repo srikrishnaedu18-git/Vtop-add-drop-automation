@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: vtop-add-drop-bot
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: VTOP_USERNAME
+        sync: false
+      - key: VTOP_PASSWORD
+        sync: false
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: COURSES_TO_MONITOR
+        value: '[{"category": "DE", "keyword": "Cyber Security", "page": 2, "action": "register", "target_faculty": "", "target_slot": "1"}, {"category": "View/Modify", "keyword": "Software Industrialization and Economics", "page": 1, "action": "modify", "target_faculty": "PRABHU J", "target_slot": "1"}]'
+      - key: REGISTER
+        value: "false"
+      - key: MODIFY
+        value: "true"
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        value: "+14155238886"
+      - key: MY_PHONE_NUMBER
+        value: "+919080014281"
+      - key: print_scrapper_data_in_terminal
+        value: "true"
+      - key: MONITOR_DELAY_SECONDS
+        value: "30"
