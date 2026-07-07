@@ -1068,7 +1068,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def dashboard():
     status_text = SCRAPER_STATUS["status"]
     last_run = SCRAPER_STATUS["last_run"]
