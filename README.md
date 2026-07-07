@@ -68,9 +68,61 @@ python tools/show_db.py
 ```
 
 
+## ⚙️ Automated Workflows (Registration vs. Modification)
+
+The automation engine supports two distinct workflows running simultaneously. You can configure target actions, faculties, and slots on a per-course level directly within the `COURSES_TO_MONITOR` JSON array:
+
+### Configuration Parameters per Course:
+*   `action`: `"register"`, `"modify"`, or `"monitor"` (omit or leave blank to only monitor).
+*   `target_faculty`: Faculty keyword to match (e.g. `"PRABHU J"`). If empty `""`, matches *any* faculty.
+*   `target_slot`: Slot pattern to match (e.g. `"1"` to match any slot containing "1" like `D1`, `D1+TD1`, `G1+TG1`).
+*   `category` & `page`: Category type (e.g. `DE`, `PC`, `UC`, or `View/Modify` / `Modify`) and page numbers.
+
+### Terminal Output Settings:
+*   `print_scrapper_data_in_terminal`: Set to `true` in `.env` to output real-time scraped slot statistics directly to your console.
+    *   If all faculties/slots are full: prints `all the fac are full`.
+    *   Otherwise: prints each available slot name and its remaining seat count.
+
+### Heuristic Matcher:
+
+The script filters open slots matching the `target_slot` pattern.
+1. If the preferred `target_faculty` is available on any of the matching slots, it is selected.
+2. If the preferred faculty is **not** available, the script automatically falls back to select **any** available faculty on a matching slot.
+
+---
+
+### Example Configuration:
+```ini
+COURSES_TO_MONITOR='[
+  {
+    "category": "DE",
+    "keyword": "Cyber Security",
+    "page": 2,
+    "action": "register",
+    "target_faculty": "",
+    "target_slot": "1"
+  },
+  {
+    "category": "View/Modify",
+    "keyword": "Software Industrialization",
+    "page": 1,
+    "action": "modify",
+    "target_faculty": "PRABHU J",
+    "target_slot": "1"
+  }
+]'
+```
+
+This configuration executes the following loop:
+1. **Registration Flow for Cyber Security**: Navigates to DE Page 2 ➡️ Scrapes slots. Looks for **any slot containing "1"** (e.g., `D1`, `D1+TD1`). If open, it registers (prioritizing the global `CHOSEN_FACULTY` if configured, otherwise taking any available faculty).
+2. **Modification Flow for Software Industrialization**: Clicks **View / Modify** dashboard button ➡️ Clicks **Modify** in the matching course row ➡️ Looks for **any slot containing "1"** (e.g., `G1+TG1`). If open, it modifies using Gmail OTP (prioritizing `PRABHU J` if open, otherwise taking any available faculty).
+3. **Loop**: Clicks Home ➡️ Sleep ➡️ Repeat.
+
+
 ---
 
 ## ⚠️ Security & Safety Warning
+
 
 > [!WARNING]
 > Automatically submitting forms on university portals can violate terms of service. Use this script responsibly. By default, `REGISTER` and `MODIFY` are set to `false` in `.env` to prevent accidental submissions. Always dry-run and verify browser behavior.
