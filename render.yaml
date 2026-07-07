@@ -29,6 +29,6 @@ services:
       - key: MY_PHONE_NUMBER
         value: "+919080014281"
       - key: print_scrapper_data_in_terminal
-        value: "true"
+        value: "false"
       - key: MONITOR_DELAY_SECONDS
         value: "30"

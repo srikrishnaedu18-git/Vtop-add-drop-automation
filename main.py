@@ -34,7 +34,8 @@ USERNAME       = os.getenv("VTOP_USERNAME", "").strip()
 PASSWORD       = os.getenv("VTOP_PASSWORD", "").strip()
 BASE_URL       = os.getenv("BASE_URL",      "https://vtopreg.vit.ac.in/tablet/")
 CHROME_PATH    = os.getenv("CHROME_PATH",   "/usr/bin/google-chrome")
-HEADLESS       = os.getenv("HEADLESS", "false").lower() == "true"
+IS_DOCKER      = os.path.exists("/.dockerenv") or os.getenv("PORT") is not None
+HEADLESS       = os.getenv("HEADLESS", "true" if IS_DOCKER else "false").lower() == "true"
 MAX_RETRIES    = 8
 DB_PATH        = os.getenv("DB_PATH", "seats.db").strip()
 MONITOR_DELAY_SECONDS = int(os.getenv("MONITOR_DELAY_SECONDS", "30"))
@@ -829,8 +830,9 @@ async def run():
 
 
     async with async_playwright() as pw:
+        chrome_path = CHROME_PATH if CHROME_PATH and os.path.exists(CHROME_PATH) else None
         browser = await pw.chromium.launch(
-            executable_path=CHROME_PATH, headless=HEADLESS,
+            executable_path=chrome_path, headless=HEADLESS,
             args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
         
