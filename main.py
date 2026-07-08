@@ -1219,6 +1219,14 @@ async def dashboard():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTOP Scraper Dashboard</title>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <script>
+            (function() {{
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'light') {{
+                    document.documentElement.classList.add('light-theme');
+                }}
+            }})();
+        </script>
         <style>
             :root {{
                 --bg-color: #0d1117;
@@ -1228,6 +1236,17 @@ async def dashboard():
                 --text-secondary: #8b949e;
                 --accent-color: #58a6ff;
                 --danger-color: #da3637;
+                --modal-bg: #161b22;
+            }}
+            :root.light-theme {{
+                --bg-color: #f6f8fa;
+                --card-bg: rgba(255, 255, 255, 0.95);
+                --border-color: #d0d7de;
+                --text-primary: #24292f;
+                --text-secondary: #57606a;
+                --accent-color: #0969da;
+                --danger-color: #cf222e;
+                --modal-bg: #ffffff;
             }}
             * {{ box-sizing: border-box; }}
             body {{
@@ -1285,7 +1304,7 @@ async def dashboard():
             }}
             .pipeline-card {{
                 flex: 0 0 240px;
-                background: rgba(22, 27, 34, 0.95);
+                background: var(--card-bg);
                 border: 1px solid var(--border-color);
                 border-radius: 10px;
                 padding: 15px;
@@ -1401,7 +1420,7 @@ async def dashboard():
                 animation: fadeIn 0.2s ease-out;
             }}
             .modal-content {{
-                background: #161b22;
+                background: var(--modal-bg);
                 border: 1px solid var(--border-color);
                 border-radius: 12px;
                 width: 90%;
@@ -1458,6 +1477,10 @@ async def dashboard():
                 outline: none;
                 transition: border-color 0.2s;
             }}
+            select option {{
+                background-color: var(--modal-bg) !important;
+                color: var(--text-primary) !important;
+            }}
             .form-group input:focus, .form-group select:focus {{
                 border-color: var(--accent-color);
             }}
@@ -1472,7 +1495,7 @@ async def dashboard():
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                background: #0d1117;
+                background: var(--bg-color);
             }}
             @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
             @keyframes slideUp {{ from {{ transform: translateY(20px); }} to {{ transform: translateY(0); }} }}
@@ -1606,6 +1629,43 @@ async def dashboard():
             .help-content li {{
                 margin-bottom: 4px;
             }}
+
+            /* Theme Toggle Switch CSS */
+            .theme-toggle-btn {{
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid var(--border-color);
+                border-radius: 50%;
+                width: 34px;
+                height: 34px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+                color: var(--text-primary);
+                padding: 0;
+                outline: none;
+                margin-left: 8px;
+            }}
+            .theme-toggle-btn:hover {{
+                background: rgba(255, 255, 255, 0.1);
+                border-color: var(--accent-color);
+                color: var(--accent-color);
+                transform: scale(1.05);
+            }}
+            .theme-icon {{
+                width: 18px;
+                height: 18px;
+                transition: transform 0.3s ease;
+            }}
+            
+            /* Toggle visibility based on light-theme class on root element */
+            .light-theme .sun-icon {{
+                display: none;
+            }}
+            :root:not(.light-theme) .moon-icon {{
+                display: none;
+            }}
         </style>
     </head>
     <body>
@@ -1615,6 +1675,22 @@ async def dashboard():
                 <div class="header-right">
                     <span id="refresh-indicator">⟳ Auto-refresh: 10s</span>
                     <span id="status-badge" class="badge {badge_class}">{status_text}</span>
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+                        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="theme-icon moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
                     <div class="profile-trigger" onclick="openEnvModal()">
                         <div class="profile-avatar">SK</div>
                         <span class="profile-name">Sri Krishna R</span>
@@ -2137,8 +2213,8 @@ async def dashboard():
         }};
 
         window.handleDragLeave = function(e) {{
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.background = 'rgba(22, 27, 34, 0.95)';
+            e.currentTarget.style.borderColor = '';
+            e.currentTarget.style.background = '';
         }};
 
         window.handleDrop = function(e, targetIdx) {{
@@ -2162,8 +2238,8 @@ async def dashboard():
             // Reset styles on all cards
             const cards = document.querySelectorAll('.pipeline-card');
             cards.forEach(c => {{
-                c.style.borderColor = 'var(--border-color)';
-                c.style.background = 'rgba(22, 27, 34, 0.95)';
+                c.style.borderColor = '';
+                c.style.background = '';
             }});
             dragSourceIndex = null;
         }};
@@ -2281,6 +2357,11 @@ async def dashboard():
             }} catch(e) {{ console.warn('Refresh failed', e); }}
             countdown = REFRESH_INTERVAL / 1000;
         }}
+
+        window.toggleTheme = function() {{
+            const isLight = document.documentElement.classList.toggle('light-theme');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }};
 
         window.openEnvModal = async function() {{
             try {{
