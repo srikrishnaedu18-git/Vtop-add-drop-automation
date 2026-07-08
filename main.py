@@ -1914,7 +1914,7 @@ async def dashboard():
             </div>
 
             <div class="card" style="margin-bottom:30px;">
-                <h2>Activity Log (Last 100)</h2>
+                <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">Activity Log <span id="activity-log-course-title" style="font-size:13px;font-weight:400;color:var(--accent-color);"></span></h2>
                 <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
                     <table style="margin-top:0; width: 100%;">
                         <thead style="position: sticky; top: 0; background: var(--table-header-bg); z-index: 10; border-bottom: 2px solid var(--border-color);">
@@ -2197,6 +2197,7 @@ async def dashboard():
         }}
 
         let allSeats = [];
+        let allLogs = [];
         let currentCourseIndex = 0;
         let configCourses = [];
         let isConfigLoaded = false;
@@ -2243,6 +2244,9 @@ async def dashboard():
                     <td class='${{avail_class(s.available)}}'>${{s.available||'-'}}</td>
                     <td style='color:var(--text-secondary);font-size:13px;'>${{s.timestamp||'-'}}</td>
                 </tr>`).join('');
+            
+            // Sync the activity log to the same active course
+            render_logs_filtered(allLogs, activeCourse);
         }}
 
         window.prevCourse = function() {{
@@ -2262,12 +2266,31 @@ async def dashboard():
         }}
 
         function render_logs(logs) {{
+            allLogs = logs || [];
+            // Find the active course from the live seat status panel
+            const groups = group_seats_by_course(allSeats);
+            const keys = Object.keys(groups);
+            const activeCourse = keys.length ? keys[currentCourseIndex < keys.length ? currentCourseIndex : 0] : null;
+            render_logs_filtered(allLogs, activeCourse);
+        }}
+
+        function render_logs_filtered(logs, courseFilter) {{
             const tbody = document.getElementById('logs-tbody');
+            // Update the activity log section header to show synced course name
+            const logTitleEl = document.getElementById('activity-log-course-title');
+            if (logTitleEl) {{
+                logTitleEl.textContent = courseFilter ? `— ${{courseFilter}}` : '';
+            }}
             if (!logs || !logs.length) {{
                 tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;color:var(--text-secondary)'>No activity yet.</td></tr>";
                 return;
             }}
-            tbody.innerHTML = logs.map(l => {{
+            const filtered = courseFilter ? logs.filter(l => (l.course_name || '') === courseFilter) : logs;
+            if (!filtered.length) {{
+                tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;color:var(--text-secondary)'>No activity for this course yet.</td></tr>";
+                return;
+            }}
+            tbody.innerHTML = filtered.map(l => {{
                 const badge = l.changed ? "<span class='changed-badge'>YES 🔔</span>" : "<span style='color:var(--text-secondary)'>NO</span>";
                 return `<tr>
                     <td style='color:var(--text-secondary);font-size:13px;'>${{l.timestamp||'-'}}</td>
