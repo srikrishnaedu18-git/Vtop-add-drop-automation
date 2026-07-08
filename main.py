@@ -10,8 +10,14 @@ Flow:
 
 import asyncio
 import os
+import time
 import json
 import sqlite3
+
+# Set default timezone to IST (Asia/Kolkata)
+os.environ['TZ'] = 'Asia/Kolkata'
+if hasattr(time, 'tzset'):
+    time.tzset()
 from datetime import datetime
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
@@ -1346,7 +1352,12 @@ async def dashboard():
             const s = status.status||'';
             badge.textContent = s;
             badge.className = 'badge ' + (s.includes('Active') ? 'badge-active' : s.includes('Crash') ? 'badge-error' : 'badge-sleeping');
-            val.textContent = s;
+            
+            let displayVal = s;
+            if (status.error) {{
+                displayVal += ` <span style='font-size: 14px; font-weight: normal; color: var(--danger-color);'>(${{status.error}})</span>`;
+            }}
+            val.innerHTML = displayVal;
             run.textContent = status.last_run||'Never';
         }}
 
@@ -1366,7 +1377,7 @@ async def dashboard():
 
         async function refresh() {{
             try {{
-                const res = await fetch('/api/data');
+                const res = await fetch('/api/data?t=' + Date.now());
                 const data = await res.json();
                 render_status(data.status);
                 render_seats(data.seats);
