@@ -1282,7 +1282,7 @@ async def dashboard():
             """
 
     profile_name = os.getenv("DISPLAY_NAME", "Sri Krishna R")
-    if not profile_name:
+    if not profile_name or not profile_name.strip():
         profile_name = "Sri Krishna R"
     parts = profile_name.split()
     if len(parts) >= 2:
@@ -2723,7 +2723,9 @@ async def get_env_config():
             if k == "TWILIO_FROM_NUMBER":
                 val = env_file_data.get("TWILIO_FROM_NUMBER", os.getenv("TWILIO_FROM_NUMBER", os.getenv("TWILIO_FROM", "")))
             else:
-                val = os.getenv(k, "")
+                val = os.getenv(k, "Sri Krishna R" if k == "DISPLAY_NAME" else "")
+        if k == "DISPLAY_NAME" and (not val or not val.strip()):
+            val = "Sri Krishna R"
         res[k] = val.strip() if val else ""
         
     return JSONResponse(res)
