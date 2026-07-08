@@ -55,6 +55,18 @@ class LiveLogWriter:
     def flush(self):
         self.original_stream.flush()
 
+    def isatty(self):
+        return hasattr(self.original_stream, 'isatty') and self.original_stream.isatty()
+
+    def fileno(self):
+        if hasattr(self.original_stream, 'fileno'):
+            return self.original_stream.fileno()
+        raise OSError("fileno not supported")
+
+    @property
+    def encoding(self):
+        return getattr(self.original_stream, 'encoding', 'utf-8')
+
 import sys
 sys.stdout = LiveLogWriter(sys.stdout, GLOBAL_LOG_BUFFER)
 sys.stderr = LiveLogWriter(sys.stderr, GLOBAL_LOG_BUFFER)

@@ -1,17 +1,42 @@
 # ⚡ VIT VTOP Course Add/Drop Automation Script
 
-An advanced, high-performance automation and monitoring tool for the **VIT VTOP Add/Drop Portal 2026-27**, built using Python, Playwright, and SQLite.
+An advanced, high-performance, and feature-rich automation and monitoring tool for the **VIT VTOP Add/Drop Portal 2026-27**, built using Python, Playwright, SQLite, and a FastAPI dashboard.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Features & Capabilities
 
-*   **Automated Login & CAPTCHA Solver**: Bypasses VTOP login captchas using client-side image processing and base64 solving logic.
-*   **Fast-Refresh Single-Course Loop**: When monitoring a single course, the script skips loading the entire homepage dashboard. It performs a local "Go Back ➡️ Proceed" refresh to save time and prevent timeouts.
-*   **1-Click Auto-Registration**: Set `REGISTER=true`, select a `CHOSEN_FACULTY` and `CHOSEN_SLOT`, and the script will automatically select the matching row and click **Register** as soon as a seat opens.
-*   **1-Click Auto-Modification (with OTP)**: Set `MODIFY=true` to update an existing course. The script automatically reads the required 3-letter OTP prefix, polls Gmail, extracts the VTOP OTP, inputs it, and clicks **Update**.
-*   **Relational Seat Change Logging**: Stores seat metrics per-faculty in an SQLite database (`seat_logs`). Transition rules ensure duplicate "Full" states are suppressed, logging only real changes or numerical seat heartbeats.
-*   **WhatsApp Instant Notifications**: Integrates with Twilio API to push real-time alerts showing only the available slots when seat availability shifts.
+### 🤖 Automation & CAPTCHA Bypassing
+*   **Intelligent CAPTCHA Solver**: Integrates a client-side base64 image-processing solver that automatically decrypts and solves VTOP login and progress CAPTCHAs, handling session timeouts without human intervention.
+*   **Fast-Refresh Single-Course Loop**: Optimization that bypasses VTOP homepage dashboard reloading when monitoring a single course. It executes a local "Go Back ➡️ Proceed" loop to check seats up to 5x faster.
+*   **Self-Healing Sessions**: Automatic detection of session timeouts or portal crashes, spawning a fresh browser context, re-logging in, and resuming monitoring.
+
+### ⚙️ Automated Workflows
+*   **1-Click Auto-Registration**: Set `REGISTER=true`, and the scraper will automatically navigate, select, and enroll in your specified course, faculty, and slot as soon as a seat opens.
+*   **1-Click Auto-Modification (with Gmail OTP)**: Set `MODIFY=true` to handle swapping courses. The engine automatically navigates to the View/Modify menu, checks seat availability, polls Gmail via IMAP, extracts the 6-digit OTP, fills it, and submits the update.
+*   **Heuristic Matcher**: Intelligent selection algorithm that:
+    1. Prioritizes the exact combination of preferred faculty and slot.
+    2. Falls back to select **any** available faculty matching the target slot if the preferred faculty is full.
+
+### 🔒 Privacy & "Blur Mode" Anonymization
+*   **Public Stream Protection**: A built-in "Blur Mode" (LinkedIn Anonymize) designed specifically for public screen sharing or video recording.
+*   **Dynamic Client Redaction**: Automatically blurs sensitive elements in the UI—such as faculty names and personal phone numbers.
+*   **Sanitized Console Logs**: Redacts phone numbers (matching `+91XXXXXXXXXX`) and target faculty names in real-time within the live terminal log viewer.
+
+### 🖥️ Live Web Dashboard (FastAPI)
+*   **Interactive Config Editor**: A dedicated profile settings modal where you can edit Display Name, Privacy settings, VTOP credentials, Gmail credentials, Twilio API credentials, and Scraper parameters in real-time. Settings are persisted directly back to the local `.env` file.
+*   **Live Seat Status Slider**: Interactive cards that display real-time seat availability across all configured courses. Paginate through subjects using the intuitive Left (`←`) and Right (`→`) controls.
+*   **Live Console Log Stream**: Polls stdout/stderr in real-time and streams terminal log outputs directly onto the dashboard with dynamic Blur Mode filters.
+*   **IST Timezone Alignment**: Formatted in Indian Standard Time (IST - Asia/Kolkata) across dashboard counters, SQLite logs, and alerts.
+
+### 📊 Logs & Database Analytics
+*   **Relational SQLite DB Logging**: Persists seat status checks and status changes in a local SQLite database (`seats.db`).
+*   **State-Transition Filtering**: Implements database optimization to suppress duplicate "Full" states, logging only numerical seat changes or actual availability transitions.
+*   **Interactive Log Filters**: Filters dashboard activity logs dynamically based on the active course selected in the Seat Status slider.
+
+### 💬 Real-Time Notifications
+*   **Twilio WhatsApp alerts**: Transmits instant notifications showing real-time availability changes.
+*   **Global Alert Gate**: Exposed toggles (`WHATSAPP_ENABLED`) in the environment settings to turn notifications on or off globally.
 
 ---
 
@@ -41,23 +66,23 @@ playwright install chromium
 ```
 
 ### 3. Configuration
-Copy the environment variables template and configure it with your credentials:
+Copy the environment variables template and configure it:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill out:
+Open `.env` and fill out your configuration parameters:
 *   `VTOP_USERNAME` & `VTOP_PASSWORD`
-*   `GMAIL_ADDRESS` & `GMAIL_APP_PASSWORD` (if using course modification/OTP features)
-*   `TWILIO` credentials & phone numbers (for WhatsApp alerts)
-*   `CHOSEN_FACULTY` & `CHOSEN_SLOT` (to automate actions on a specific slot)
+*   `GMAIL_ADDRESS` & `GMAIL_APP_PASSWORD` (for Gmail OTP auto-retrieval)
+*   `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `MY_PHONE_NUMBER` (for WhatsApp alerts)
+*   `COURSES_TO_MONITOR` (JSON list of courses, see section below)
 
 ---
 
 ## 🚀 Running the Script
 
-### Start Monitoring Loop
+### Start Monitoring Loop & Web Dashboard
 ```bash
 python main.py
 ```
@@ -67,41 +92,17 @@ python main.py
 python tools/show_db.py
 ```
 
-
-## 🖥️ Web Interface & Live Dashboard
-
-The application features a lightweight, high-performance web interface built with FastAPI that acts as a real-time command center:
-
-*   **Interactive Course Configuration**: Update subjects to monitor directly from the web dashboard. Add new courses, set categories, page numbers, target slots/faculties, and choose actions (`modify` / `register` / `monitor`). Saving settings updates the memory configuration instantly and persists them to `monitored_courses.json`.
-*   **Live Seats Subject Slider**: Paginate through seat availability of different courses gracefully using the Left (`←`) and Right (`→`) slider controls.
-*   **Persistent & Dynamic Status**: Scraper status (Active/Sleeping/Crashed) and latest run timestamps render dynamically in real-time in your browser (utilizing cache-busting request parameters).
-*   **Scrollable Activity Log**: View up to 100 historical seat transition changes inside a neat, scrollable component with sticky table headers.
-*   **Live Console stream**: Stream stdout terminal output directly inside the dashboard.
-*   **Timezone Localization**: All timestamps on the dashboard, SQLite database logs, and notifications are formatted in Indian Standard Time (IST - Asia/Kolkata).
-
+---
 
 ## ⚙️ Automated Workflows (Registration vs. Modification)
 
 The automation engine supports two distinct workflows running simultaneously. You can configure target actions, faculties, and slots on a per-course level directly within the `COURSES_TO_MONITOR` JSON array:
 
-### Configuration Parameters per Course:
+### Course Parameters:
 *   `action`: `"register"`, `"modify"`, or `"monitor"` (omit or leave blank to only monitor).
 *   `target_faculty`: Faculty keyword to match (e.g. `"PRABHU J"`). If empty `""`, matches *any* faculty.
 *   `target_slot`: Slot pattern to match (e.g. `"1"` to match any slot containing "1" like `D1`, `D1+TD1`, `G1+TG1`).
 *   `category` & `page`: Category type (e.g. `DE`, `PC`, `UC`, or `View/Modify` / `Modify`) and page numbers.
-
-### Terminal Output Settings:
-*   `print_scrapper_data_in_terminal`: Set to `true` in `.env` to output real-time scraped slot statistics directly to your console.
-    *   If all faculties/slots are full: prints `all the fac are full`.
-    *   Otherwise: prints each available slot name and its remaining seat count.
-
-### Heuristic Matcher:
-
-The script filters open slots matching the `target_slot` pattern.
-1. If the preferred `target_faculty` is available on any of the matching slots, it is selected.
-2. If the preferred faculty is **not** available, the script automatically falls back to select **any** available faculty on a matching slot.
-
----
 
 ### Example Configuration:
 ```ini
@@ -130,11 +131,9 @@ This configuration executes the following loop:
 2. **Modification Flow for Software Industrialization**: Clicks **View / Modify** dashboard button ➡️ Clicks **Modify** in the matching course row ➡️ Looks for **any slot containing "1"** (e.g., `G1+TG1`). If open, it modifies using Gmail OTP (prioritizing `PRABHU J` if open, otherwise taking any available faculty).
 3. **Loop**: Clicks Home ➡️ Sleep ➡️ Repeat.
 
-
 ---
 
 ## ⚠️ Security & Safety Warning
-
 
 > [!WARNING]
 > Automatically submitting forms on university portals can violate terms of service. Use this script responsibly. By default, `REGISTER` and `MODIFY` are set to `false` in `.env` to prevent accidental submissions. Always dry-run and verify browser behavior.
