@@ -21,6 +21,33 @@ try:
 except ImportError:
     pass
 
+# ─── Live Log Console Redirection ─────────────────────────────────────────────
+GLOBAL_LOG_BUFFER = []
+
+class LiveLogWriter:
+    def __init__(self, original_stream, log_buffer):
+        self.original_stream = original_stream
+        self.log_buffer = log_buffer
+
+    def write(self, message):
+        self.original_stream.write(message)
+        lines = message.split("\n")
+        for line in lines:
+            cleaned = line.strip()
+            if cleaned:
+                ts = datetime.now().strftime("%H:%M:%S")
+                self.log_buffer.append({"timestamp": ts, "message": cleaned})
+                if len(self.log_buffer) > 100:
+                    self.log_buffer.pop(0)
+
+    def flush(self):
+        self.original_stream.flush()
+
+import sys
+sys.stdout = LiveLogWriter(sys.stdout, GLOBAL_LOG_BUFFER)
+sys.stderr = LiveLogWriter(sys.stderr, GLOBAL_LOG_BUFFER)
+
+
 try:
     from twilio.rest import Client
 except ImportError:
@@ -649,7 +676,7 @@ async def check_and_trigger_registration(page, course_config: dict, course_name:
         print(f"  [i] No available slots match pattern '{target_slot_pattern}'. Continuing monitoring.")
         return False
 
-    # Prioritize preferred faculty
+    # Match ONLY preferred faculty — if a target_faculty is specified, DO NOT fall back to others
     target_slot = None
     if target_faculty_pattern:
         for s in matching_slots:
@@ -657,11 +684,14 @@ async def check_and_trigger_registration(page, course_config: dict, course_name:
                 target_slot = s
                 break
 
-    # Fallback to first available matching slot if preferred faculty not open
     if not target_slot:
-        target_slot = matching_slots[0]
-        print(f"  [i] Preferred faculty '{target_faculty_pattern}' not available on matching slots. "
-              f"Falling back to available faculty '{target_slot['faculty']}' on slot '{target_slot['slot']}'.")
+        if target_faculty_pattern:
+            # Preferred faculty has no open seats — do NOT fall back, just keep waiting
+            print(f"  [i] Preferred faculty '{target_faculty_pattern}' is not available yet. Waiting...")
+            return False
+        else:
+            # No faculty preference set — pick the first available slot
+            target_slot = matching_slots[0]
 
     print(f"\n🚀 [AUTOMATOR TRIGGERED] Selected slot '{target_slot['slot']}' with faculty '{target_slot['faculty']}' ({target_slot['available']} seats)!")
 
@@ -872,10 +902,10 @@ async def run():
                         msg_data = await scrape_and_format(page, keyword)
                         if msg_data:
                             msg, avail_count, course_name, slots = msg_data
-                            print("\n" + "═" * 60)
-                            print("Extracted Data:\n")
-                            print(msg)
-                            print("\n" + "═" * 60)
+                            # Always print extracted data
+                            for s in slots:
+                                avail_display = s['available']
+                                print(f"  Slot: {s['slot']:<10} | Faculty: {s['faculty']:<22} | Available: {avail_display}")
 
                             init_db()
                             is_changed = check_and_save_db(course_name, slots)
@@ -888,11 +918,11 @@ async def run():
                                 print(f"\n[!] Hourly update trigger for '{course_name}'! Sending full faculty list...")
                                 hourly_msg = format_all_slots_msg(course_name, slots)
                                 send_whatsapp_alert(hourly_msg)
-                            elif is_changed:
-                                print("\n[!] Data CHANGED since last run! Triggering WhatsApp API...")
+                            elif is_changed and avail_count > 0:
+                                print("\n[!] Availability CHANGED! Triggering WhatsApp API...")
                                 send_whatsapp_alert(msg)
                             else:
-                                print("\n[i] Data is IDENTICAL to the last run. Stored heartbeat in DB. Not sending WhatsApp spam.")
+                                print("\n[i] No change in availability. Not sending WhatsApp.")
 
                             await check_and_trigger_registration(page, course_config, course_name, slots)
                         else:
@@ -944,10 +974,9 @@ async def run():
                             msg_data = await scrape_and_format(page, course_config.get("keyword"))
                             if msg_data:
                                 msg, avail_count, course_name, slots = msg_data
-                                print("\n" + "═" * 60)
-                                print("Extracted Data:\n")
-                                print(msg)
-                                print("\n" + "═" * 60)
+                                # Always print extracted data
+                                for s in slots:
+                                    print(f"  Slot: {s['slot']:<10} | Faculty: {s['faculty']:<22} | Available: {s['available']}")
 
                                 init_db()
                                 is_changed = check_and_save_db(course_name, slots)
@@ -960,11 +989,11 @@ async def run():
                                     print(f"\n[!] Hourly update trigger for '{course_name}'! Sending full faculty list...")
                                     hourly_msg = format_all_slots_msg(course_name, slots)
                                     send_whatsapp_alert(hourly_msg)
-                                elif is_changed:
-                                    print("\n[!] Data CHANGED since last run! Triggering WhatsApp API...")
+                                elif is_changed and avail_count > 0:
+                                    print("\n[!] Availability CHANGED! Triggering WhatsApp API...")
                                     send_whatsapp_alert(msg)
                                 else:
-                                    print("\n[i] Data is IDENTICAL to the last run. Stored heartbeat in DB. Not sending WhatsApp spam.")
+                                    print("\n[i] No change in availability. Not sending WhatsApp.")
 
                                 await check_and_trigger_registration(page, course_config, course_name, slots)
                             else:
@@ -1162,191 +1191,215 @@ async def dashboard():
         <style>
             :root {{
                 --bg-color: #0d1117;
-                --card-bg: rgba(22, 27, 34, 0.7);
+                --card-bg: rgba(22, 27, 34, 0.85);
                 --border-color: #30363d;
                 --text-primary: #c9d1d9;
                 --text-secondary: #8b949e;
                 --accent-color: #58a6ff;
-                --success-color: #238636;
                 --danger-color: #da3637;
             }}
+            * {{ box-sizing: border-box; }}
             body {{
                 font-family: 'Plus Jakarta Sans', sans-serif;
                 background-color: var(--bg-color);
                 color: var(--text-primary);
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
+                margin: 0; padding: 20px;
+                display: flex; flex-direction: column; align-items: center;
             }}
-            .container {{
-                width: 100%;
-                max-width: 1200px;
-            }}
+            .container {{ width: 100%; max-width: 1200px; }}
             header {{
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 30px;
-                border-bottom: 1px solid var(--border-color);
-                padding-bottom: 20px;
+                display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;
             }}
             h1 {{
-                margin: 0;
-                font-size: 24px;
-                font-weight: 700;
+                margin: 0; font-size: 24px; font-weight: 700;
                 background: linear-gradient(45deg, #58a6ff, #bc8cff);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             }}
-            .badge {{
-                padding: 6px 12px;
+            .header-right {{ display: flex; align-items: center; gap: 12px; }}
+            #refresh-indicator {{
+                font-size: 11px; color: var(--text-secondary);
+                padding: 4px 8px; border: 1px solid var(--border-color);
                 border-radius: 20px;
-                font-size: 12px;
-                font-weight: 600;
-                text-transform: uppercase;
             }}
-            .badge-active {{
-                background-color: rgba(35, 134, 54, 0.2);
-                color: #3fb950;
-                border: 1px solid rgba(63, 185, 80, 0.3);
-            }}
-            .badge-sleeping {{
-                background-color: rgba(240, 139, 0, 0.2);
-                color: #f08b00;
-                border: 1px solid rgba(240, 139, 0, 0.3);
-            }}
-            .badge-error {{
-                background-color: rgba(218, 54, 55, 0.2);
-                color: #f85149;
-                border: 1px solid rgba(248, 81, 73, 0.3);
-            }}
-            .grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 20px;
-                margin-bottom: 30px;
-            }}
-            .card {{
-                background: var(--card-bg);
-                border: 1px solid var(--border-color);
-                border-radius: 12px;
-                padding: 20px;
-                backdrop-filter: blur(10px);
-            }}
-            .card h2 {{
-                margin-top: 0;
-                font-size: 16px;
-                color: var(--text-secondary);
-                font-weight: 500;
-                margin-bottom: 15px;
-            }}
-            .status-val {{
-                font-size: 28px;
-                font-weight: 700;
-                margin: 10px 0;
-            }}
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 10px;
-            }}
-            th, td {{
-                text-align: left;
-                padding: 12px;
-                border-bottom: 1px solid var(--border-color);
-                font-size: 14px;
-            }}
-            th {{
-                color: var(--text-secondary);
-                font-weight: 500;
-            }}
-            tr:hover {{
-                background-color: rgba(255, 255, 255, 0.02);
-            }}
-            .highlight {{
-                font-weight: 600;
-                color: #58a6ff;
-            }}
-            .changed-badge {{
-                background-color: rgba(88, 166, 255, 0.2);
-                color: #58a6ff;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: 600;
-            }}
+            .badge {{ padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }}
+            .badge-active  {{ background: rgba(35,134,54,.2);  color: #3fb950; border: 1px solid rgba(63,185,80,.3); }}
+            .badge-sleeping{{ background: rgba(240,139,0,.2);  color: #f08b00; border: 1px solid rgba(240,139,0,.3); }}
+            .badge-error   {{ background: rgba(218,54,55,.2);  color: #f85149; border: 1px solid rgba(248,81,73,.3); }}
+            .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+            .card {{ background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }}
+            .card h2 {{ margin-top: 0; font-size: 15px; color: var(--text-secondary); font-weight: 500; margin-bottom: 15px; }}
+            .status-val {{ font-size: 26px; font-weight: 700; margin: 8px 0; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+            th, td {{ text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border-color); font-size: 14px; }}
+            th {{ color: var(--text-secondary); font-weight: 500; }}
+            tr:hover {{ background: rgba(255,255,255,.02); }}
+            .avail-open {{ color: #3fb950; font-weight: 600; }}
+            .avail-full {{ color: var(--danger-color); font-weight: 500; }}
+            .highlight {{ font-weight: 600; color: #58a6ff; }}
+            .changed-badge {{ background: rgba(88,166,255,.15); color: #58a6ff; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
+            .pulse {{ animation: pulse 2s infinite; }}
+            @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.4; }} }}
+            code {{ background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
         </style>
     </head>
     <body>
         <div class="container">
             <header>
                 <h1>FALL SEMESTER ADD/DROP 2026-27</h1>
-                <div>
-                    <span class="badge {badge_class}">{status_text}</span>
+                <div class="header-right">
+                    <span id="refresh-indicator">⟳ Auto-refresh: 10s</span>
+                    <span id="status-badge" class="badge {badge_class}">{status_text}</span>
                 </div>
             </header>
 
             <div class="grid">
                 <div class="card">
                     <h2>Scraper Status</h2>
-                    <div class="status-val">{status_val}</div>
-                    <div style="color: var(--text-secondary); font-size: 12px;">Last Run: {last_run}</div>
+                    <div class="status-val" id="status-val">{status_val}</div>
+                    <div style="color:var(--text-secondary);font-size:12px;">Last Run: <span id="last-run">{last_run}</span></div>
                 </div>
                 <div class="card">
                     <h2>Monitoring Config</h2>
-                    <div style="font-size: 14px; line-height: 1.6;">
+                    <div style="font-size:14px;line-height:1.8;">
                         <strong>Mode:</strong> {mode_text}<br>
-                        <strong>Interval:</strong> {MONITOR_DELAY_SECONDS} seconds<br>
-                        <strong>REGISTER Switch:</strong> {register_switch}<br>
-                        <strong>MODIFY Switch:</strong> {modify_switch}
+                        <strong>Interval:</strong> {MONITOR_DELAY_SECONDS}s<br>
+                        <strong>REGISTER:</strong> {register_switch}<br>
+                        <strong>MODIFY:</strong> {modify_switch}
                     </div>
                 </div>
             </div>
 
-            <div class="card" style="margin-bottom: 30px;">
-                <h2>Latest Seat Status (Current Slots)</h2>
+            <div class="card" style="margin-bottom:30px;">
+                <h2>Live Seat Status <span class="pulse" style="color:#3fb950;font-size:10px;">● LIVE</span></h2>
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Course</th>
-                            <th>Slot</th>
-                            <th>Faculty</th>
-                            <th>Available Seats</th>
-                            <th>Last Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {current_seats_rows}
-                    </tbody>
+                    <thead><tr><th>Course</th><th>Slot</th><th>Faculty</th><th>Available Seats</th><th>Last Updated</th></tr></thead>
+                    <tbody id="seats-tbody">{current_seats_rows}</tbody>
+                </table>
+            </div>
+
+            <div class="card" style="margin-bottom:30px;">
+                <h2>Activity Log (Last 30)</h2>
+                <table>
+                    <thead><tr><th>Timestamp</th><th>Course</th><th>Slot</th><th>Faculty</th><th>Available</th><th>Changed?</th></tr></thead>
+                    <tbody id="logs-tbody">{log_rows}</tbody>
                 </table>
             </div>
 
             <div class="card">
-                <h2>Activity Logs (Recent Transitions)</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Course</th>
-                            <th>Slot</th>
-                            <th>Faculty</th>
-                            <th>Available</th>
-                            <th>Changed?</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {log_rows}
-                    </tbody>
-                </table>
+                <h2>Live Console Logs (Terminal)</h2>
+                <div id="console-log-container" style="background: #000; color: #00ff00; font-family: monospace; font-size: 13px; padding: 15px; border-radius: 8px; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); line-height: 1.6; white-space: pre-wrap; word-break: break-all;">
+                    <div style="color: #8b949e;">Waiting for console logs...</div>
+                </div>
             </div>
         </div>
+
+        <script>
+        const REFRESH_INTERVAL = 10000;
+        let countdown = REFRESH_INTERVAL / 1000;
+        const indicator = document.getElementById('refresh-indicator');
+
+        function avail_class(v) {{
+            if (!v) return '';
+            return ['full','0','-'].includes(v.toLowerCase()) ? 'avail-full' : 'avail-open';
+        }}
+
+        function render_seats(seats) {{
+            const tbody = document.getElementById('seats-tbody');
+            if (!seats || !seats.length) {{
+                tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:var(--text-secondary)'>No data yet.</td></tr>";
+                return;
+            }}
+            tbody.innerHTML = seats.map(s => `
+                <tr>
+                    <td class='highlight'>${{s.course_name||'Unknown'}}</td>
+                    <td><code>${{s.slot||'-'}}</code></td>
+                    <td>${{s.faculty||'-'}}</td>
+                    <td class='${{avail_class(s.available)}}'>${{s.available||'-'}}</td>
+                    <td style='color:var(--text-secondary);font-size:13px;'>${{s.timestamp||'-'}}</td>
+                </tr>`).join('');
+        }}
+
+        function render_logs(logs) {{
+            const tbody = document.getElementById('logs-tbody');
+            if (!logs || !logs.length) {{
+                tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;color:var(--text-secondary)'>No activity yet.</td></tr>";
+                return;
+            }}
+            tbody.innerHTML = logs.map(l => {{
+                const badge = l.changed ? "<span class='changed-badge'>YES 🔔</span>" : "<span style='color:var(--text-secondary)'>NO</span>";
+                return `<tr>
+                    <td style='color:var(--text-secondary);font-size:13px;'>${{l.timestamp||'-'}}</td>
+                    <td>${{l.course_name||'-'}}</td>
+                    <td><code>${{l.slot||'-'}}</code></td>
+                    <td>${{l.faculty||'-'}}</td>
+                    <td class='${{avail_class(l.available)}}'>${{l.available||'-'}}</td>
+                    <td>${{badge}}</td>
+                </tr>`;
+            }}).join('');
+        }}
+
+        function render_status(status) {{
+            const badge = document.getElementById('status-badge');
+            const val   = document.getElementById('status-val');
+            const run   = document.getElementById('last-run');
+            const s = status.status||'';
+            badge.textContent = s;
+            badge.className = 'badge ' + (s.includes('Active') ? 'badge-active' : s.includes('Crash') ? 'badge-error' : 'badge-sleeping');
+            val.textContent = s;
+            run.textContent = status.last_run||'Never';
+        }}
+
+        function render_terminal_logs(logs) {{
+            const container = document.getElementById('console-log-container');
+            if (!logs || !logs.length) {{
+                container.innerHTML = "<div style='color:#8b949e;'>Waiting for console logs...</div>";
+                return;
+            }}
+            container.innerHTML = logs.map(l => {{
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{l.message}}</div>`;
+            }}).join('');
+            
+            // Auto scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }}
+
+        async function refresh() {{
+            try {{
+                const res = await fetch('/api/data');
+                const data = await res.json();
+                render_status(data.status);
+                render_seats(data.seats);
+                render_logs(data.logs);
+                render_terminal_logs(data.terminal_logs);
+            }} catch(e) {{ console.warn('Refresh failed', e); }}
+            countdown = REFRESH_INTERVAL / 1000;
+        }}
+
+        setInterval(() => {{
+            countdown--;
+            indicator.textContent = `⟳ Refreshing in ${{countdown}}s`;
+            if (countdown <= 0) refresh();
+        }}, 1000);
+        </script>
     </body>
     </html>
     """
     return html_content
 
+
+@app.get("/api/data")
+async def api_data():
+    """JSON endpoint for live polling by the dashboard JS."""
+    from fastapi.responses import JSONResponse
+    current_seats = get_latest_status_by_slot()
+    logs = get_recent_transitions()
+    return JSONResponse({
+        "status": SCRAPER_STATUS,
+        "seats": current_seats,
+        "logs": logs[:30],
+        "terminal_logs": GLOBAL_LOG_BUFFER,
+    })
 
 if __name__ == "__main__":
     if os.getenv("PORT") or os.getenv("RUN_WEB"):
