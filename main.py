@@ -1211,6 +1211,17 @@ async def dashboard():
             </tr>
             """
 
+    profile_name = os.getenv("DISPLAY_NAME", "Sri Krishna R")
+    if not profile_name:
+        profile_name = "Sri Krishna R"
+    parts = profile_name.split()
+    if len(parts) >= 2:
+        profile_initials = (parts[0][0] + parts[-1][0]).upper()
+    elif len(parts) == 1:
+        profile_initials = parts[0][:2].upper()
+    else:
+        profile_initials = "SK"
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -1376,7 +1387,7 @@ async def dashboard():
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: var(--border-color);
+                color: var(--text-secondary);
                 font-size: 20px;
                 font-weight: bold;
                 pointer-events: none;
@@ -1692,8 +1703,8 @@ async def dashboard():
                         </svg>
                     </button>
                     <div class="profile-trigger" onclick="openEnvModal()">
-                        <div class="profile-avatar">SK</div>
-                        <span class="profile-name">Sri Krishna R</span>
+                        <div class="profile-avatar">{profile_initials}</div>
+                        <span class="profile-name">{profile_name}</span>
                     </div>
                 </div>
             </header>
@@ -1831,11 +1842,24 @@ async def dashboard():
                 <div class="modal-header">
                     <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
                         <span style="width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block;"></span>
-                        System Environment Config (Sri Krishna R)
+                        System Environment Config ({profile_name})
                     </h3>
                     <button onclick="closeEnvModal()" class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding: 20px;">
+                    
+                    <!-- Personal Details Group -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Personal Details</h4>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">DISPLAY_NAME</div>
+                            <div class="env-val-container">
+                                <input type="text" id="env-display-name" placeholder="Enter Display Name (e.g. Sri Krishna R)">
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- VTOP Credentials Group -->
                     <div style="margin-bottom: 20px;">
@@ -2368,6 +2392,7 @@ async def dashboard():
                 const res = await fetch('/api/env?t=' + Date.now());
                 const env = await res.json();
                 
+                document.getElementById('env-display-name').value = env.DISPLAY_NAME || '';
                 document.getElementById('env-vtop-username').value = env.VTOP_USERNAME || '';
                 document.getElementById('env-vtop-password').value = env.VTOP_PASSWORD || '';
                 document.getElementById('env-gmail-address').value = env.GMAIL_ADDRESS || '';
@@ -2409,6 +2434,7 @@ async def dashboard():
 
         window.saveEnvToServer = async function() {{
             const payload = {{
+                DISPLAY_NAME: document.getElementById('env-display-name').value.trim(),
                 VTOP_USERNAME: document.getElementById('env-vtop-username').value.trim(),
                 VTOP_PASSWORD: document.getElementById('env-vtop-password').value.trim(),
                 GMAIL_ADDRESS: document.getElementById('env-gmail-address').value.trim(),
@@ -2522,7 +2548,7 @@ async def get_env_config():
     env_file_data = read_env_file()
     
     keys_to_read = [
-        "VTOP_USERNAME", "VTOP_PASSWORD",
+        "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
         "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
         "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
         "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
@@ -2550,7 +2576,7 @@ async def save_env_config(request: Request):
         data = await request.json()
         updates = {}
         keys = [
-            "VTOP_USERNAME", "VTOP_PASSWORD",
+            "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
             "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
             "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
             "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
