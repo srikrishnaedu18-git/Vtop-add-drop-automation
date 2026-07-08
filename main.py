@@ -896,7 +896,10 @@ async def run():
         
         while True:
             SCRAPER_STATUS["status"] = "Active 🚀"
-            SCRAPER_STATUS["last_run"] = get_ist_now().strftime("%d-%m %H:%M:%S")
+            now_dt = get_ist_now()
+            hour_12 = now_dt.strftime("%I").lstrip("0")
+            if not hour_12: hour_12 = "12"
+            SCRAPER_STATUS["last_run"] = now_dt.strftime(f"%B - %d  {hour_12}:%M:%S %p")
             SCRAPER_STATUS["error"] = None
             print("\n" + "═" * 60)
             print("[SESSION START] Starting new browser context...")
@@ -1088,20 +1091,27 @@ def convert_utc_to_ist(utc_str):
         return utc_str
     import time
     from datetime import datetime, timedelta
-    is_utc = (time.timezone == 0)
-    if not is_utc:
-        return utc_str
+    
+    dt = None
     try:
         dt = datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S")
-        dt_ist = dt + timedelta(hours=5, minutes=30)
-        return dt_ist.strftime("%Y-%m-%d %H:%M:%S")
     except:
         try:
             dt = datetime.strptime(utc_str, "%d-%m %H:%M:%S")
-            dt_ist = dt + timedelta(hours=5, minutes=30)
-            return dt_ist.strftime("%d-%m %H:%M:%S")
         except:
-            return utc_str
+            pass
+            
+    if not dt:
+        return utc_str
+        
+    is_utc = (time.timezone == 0)
+    if is_utc:
+        dt = dt + timedelta(hours=5, minutes=30)
+        
+    hour_12 = dt.strftime("%I").lstrip("0")
+    if not hour_12:
+        hour_12 = "12"
+    return dt.strftime(f"%B - %d  {hour_12}:%M:%S %p")
 
 def get_absolute_latest_scraped_time():
     if not os.path.exists(DB_PATH):
