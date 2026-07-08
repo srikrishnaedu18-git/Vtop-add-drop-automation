@@ -1077,6 +1077,26 @@ try:
 except ImportError:
     pass
 
+def convert_utc_to_ist(utc_str):
+    if not utc_str:
+        return utc_str
+    import time
+    from datetime import datetime, timedelta
+    is_utc = (time.timezone == 0)
+    if not is_utc:
+        return utc_str
+    try:
+        dt = datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S")
+        dt_ist = dt + timedelta(hours=5, minutes=30)
+        return dt_ist.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        try:
+            dt = datetime.strptime(utc_str, "%d-%m %H:%M:%S")
+            dt_ist = dt + timedelta(hours=5, minutes=30)
+            return dt_ist.strftime("%d-%m %H:%M:%S")
+        except:
+            return utc_str
+
 def get_absolute_latest_scraped_time():
     if not os.path.exists(DB_PATH):
         return None
@@ -1085,7 +1105,7 @@ def get_absolute_latest_scraped_time():
             cursor = conn.cursor()
             cursor.execute("SELECT timestamp FROM seat_logs ORDER BY timestamp DESC LIMIT 1")
             row = cursor.fetchone()
-            return row[0] if row else None
+            return convert_utc_to_ist(row[0]) if row else None
     except Exception as e:
         print(f"DB Read Error: {e}")
         return None
@@ -1127,7 +1147,13 @@ def get_latest_status_by_slot():
                     AND t1.timestamp = t2.max_ts
                 ORDER BY t1.course_name ASC, t1.slot ASC
             ''')
-            return [dict(r) for r in cursor.fetchall()]
+            rows = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                if d.get("timestamp"):
+                    d["timestamp"] = convert_utc_to_ist(d["timestamp"])
+                rows.append(d)
+            return rows
     except Exception as e:
         print(f"DB Read Error: {e}")
         return []
@@ -1140,7 +1166,13 @@ def get_recent_transitions():
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM seat_logs ORDER BY timestamp DESC LIMIT 50")
-            return [dict(r) for r in cursor.fetchall()]
+            rows = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                if d.get("timestamp"):
+                    d["timestamp"] = convert_utc_to_ist(d["timestamp"])
+                rows.append(d)
+            return rows
     except Exception as e:
         print(f"DB Read Error: {e}")
         return []
@@ -1280,6 +1312,9 @@ async def dashboard():
                 --accent-color: #58a6ff;
                 --danger-color: #da3637;
                 --modal-bg: #161b22;
+                --input-bg: rgba(0, 0, 0, 0.25);
+                --input-color: #ffffff;
+                --table-header-bg: #161b22;
             }}
             :root.light-theme {{
                 --bg-color: #f6f8fa;
@@ -1290,6 +1325,9 @@ async def dashboard():
                 --accent-color: #0969da;
                 --danger-color: #cf222e;
                 --modal-bg: #ffffff;
+                --input-bg: #ffffff;
+                --input-color: #24292f;
+                --table-header-bg: #eaeef2;
             }}
             * {{ box-sizing: border-box; }}
             body {{
@@ -1484,6 +1522,24 @@ async def dashboard():
                 font-size: 16px;
                 font-weight: 600;
             }}
+            .slider-btn {{
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                border-radius: 50%;
+                width: 32px;
+                height: 32px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                transition: background 0.2s, color 0.2s;
+            }}
+            .slider-btn:hover {{
+                background: var(--border-color);
+                color: var(--text-primary);
+            }}
             .close-btn {{
                 background: none;
                 border: none;
@@ -1493,7 +1549,49 @@ async def dashboard():
                 transition: color 0.2s;
             }}
             .close-btn:hover {{
+                color: var(--text-primary);
+            }}
+            .btn-secondary {{
+                background: var(--bg-color);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                padding: 10px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 13px;
+                transition: background 0.2s;
+            }}
+            .btn-secondary:hover {{
+                background: var(--border-color);
+            }}
+            .btn-primary {{
+                background: var(--accent-color);
+                border: 1px solid var(--accent-color);
                 color: #fff;
+                padding: 10px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 13px;
+                transition: opacity 0.2s;
+            }}
+            .btn-primary:hover {{
+                opacity: 0.9;
+            }}
+            .btn-danger {{
+                background: rgba(218,54,55,0.15);
+                border: 1px solid rgba(218,54,55,0.3);
+                color: var(--danger-color);
+                padding: 10px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 13px;
+                transition: background 0.2s;
+            }}
+            .btn-danger:hover {{
+                background: rgba(218,54,55,0.25);
             }}
             .modal-body {{
                 padding: 20px;
@@ -1510,10 +1608,10 @@ async def dashboard():
             }}
             .form-group input, .form-group select {{
                 width: 100%;
-                background: rgba(0,0,0,0.25);
+                background: var(--input-bg);
                 border: 1px solid var(--border-color);
                 border-radius: 6px;
-                color: var(--text-primary);
+                color: var(--input-color);
                 padding: 10px 12px;
                 font-family: inherit;
                 font-size: 14px;
@@ -1606,10 +1704,10 @@ async def dashboard():
             }}
             .env-val-container input, .env-val-container select {{
                 width: 100%;
-                background: rgba(0, 0, 0, 0.25) !important;
+                background: var(--input-bg) !important;
                 border: 1px solid var(--border-color) !important;
                 border-radius: 4px !important;
-                color: #fff !important;
+                color: var(--input-color) !important;
                 padding: 8px 32px 8px 10px !important;
                 font-size: 13px !important;
                 font-family: inherit !important;
@@ -1765,7 +1863,7 @@ async def dashboard():
             <div class="card" style="margin-bottom:30px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                     <h2 style="margin:0; font-size: 16px; color: var(--text-secondary); font-weight: 500;">Monitor Settings (Course Pipeline Flow)</h2>
-                    <button onclick="saveConfigToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='#2ea44f'" onmouseout="this.style.background='#238636'">Apply & Save Config</button>
+                    <button id="apply-config-btn" onclick="saveConfigToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='#2ea44f'" onmouseout="this.style.background='#238636'">Apply & Save Config</button>
                 </div>
                 
                 <div id="pipeline-container" class="pipeline-container">
@@ -1777,9 +1875,9 @@ async def dashboard():
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
                     <h2 style="margin:0; font-size: 16px; color: var(--text-secondary); font-weight: 500;">Live Seat Status <span class="pulse" style="color:#3fb950;font-size:10px;">● LIVE</span></h2>
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <button onclick="prevCourse()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">&larr;</button>
+                        <button onclick="prevCourse()" class="slider-btn" title="Previous Course">&larr;</button>
                         <span id="current-course-title" style="font-weight: 600; color: #58a6ff; font-size: 14px; background: rgba(88,166,255,0.1); padding: 4px 10px; border-radius: 20px;">Loading subject...</span>
-                        <button onclick="nextCourse()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">&rarr;</button>
+                        <button onclick="nextCourse()" class="slider-btn" title="Next Course">&rarr;</button>
                     </div>
                 </div>
                 <table>
@@ -1794,7 +1892,7 @@ async def dashboard():
                 <h2>Activity Log (Last 100)</h2>
                 <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
                     <table style="margin-top:0; width: 100%;">
-                        <thead style="position: sticky; top: 0; background: #161b22; z-index: 10; border-bottom: 2px solid var(--border-color);">
+                        <thead style="position: sticky; top: 0; background: var(--table-header-bg); z-index: 10; border-bottom: 2px solid var(--border-color);">
                             <tr><th>Timestamp</th><th>Course</th><th>Slot</th><th>Faculty</th><th>Available</th><th>Changed?</th></tr>
                         </thead>
                         <tbody id="logs-tbody">
@@ -1859,10 +1957,10 @@ async def dashboard():
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="modal-delete-btn" onclick="deleteModalCourse()" style="background: rgba(218,54,55,0.15); border: 1px solid rgba(218,54,55,0.3); color: #ff6b6b; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Delete Step</button>
+                    <button id="modal-delete-btn" onclick="deleteModalCourse()" class="btn-danger">Delete Step</button>
                     <div style="display: flex; gap: 10px;">
-                        <button onclick="closeModal()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Cancel</button>
-                        <button onclick="saveModalCourse()" style="background: #58a6ff; border: 1px solid #388bfd; color: #fff; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Save Step</button>
+                        <button onclick="closeModal()" class="btn-secondary">Cancel</button>
+                        <button onclick="saveModalCourse()" class="btn-primary">Save Step</button>
                     </div>
                 </div>
             </div>
@@ -2042,13 +2140,13 @@ async def dashboard():
                     </div>
                     
                 </div>
-                <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #0d1117;">
+                <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-color);">
                     <div style="color: var(--text-secondary); font-size: 11px;">
                         Modifications are written directly to .env
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button onclick="closeEnvModal()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Cancel</button>
-                        <button onclick="saveEnvToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Save Settings</button>
+                        <button onclick="closeEnvModal()" class="btn-secondary">Cancel</button>
+                        <button onclick="saveEnvToServer()" class="btn-primary" style="background: #238636; border: 1px solid #308f40;">Save Settings</button>
                     </div>
                 </div>
             </div>
@@ -2377,6 +2475,16 @@ async def dashboard():
         }};
 
         window.saveConfigToServer = async function() {{
+            const btn = document.getElementById('apply-config-btn');
+            const originalText = btn.textContent;
+            const originalBg = btn.style.background;
+            const originalBorder = btn.style.borderColor;
+
+            btn.disabled = true;
+            btn.textContent = 'Saving Config...';
+            btn.style.background = '#6e7681';
+            btn.style.borderColor = '#6e7681';
+
             try {{
                 const res = await fetch('/api/config', {{
                     method: 'POST',
@@ -2387,13 +2495,29 @@ async def dashboard():
                 }});
                 const resData = await res.json();
                 if (resData.status === 'success') {{
-                    alert('Settings updated successfully! The scraper will reload the configuration on its next loop.');
+                    btn.textContent = 'Config Saved!';
+                    btn.style.background = '#2ea44f';
+                    btn.style.borderColor = '#2ea44f';
+                    setTimeout(() => {{
+                        btn.textContent = originalText;
+                        btn.style.background = originalBg;
+                        btn.style.borderColor = originalBorder;
+                        btn.disabled = false;
+                    }}, 1500);
                     refresh();
                 }} else {{
                     alert('Failed to update config: ' + resData.message);
+                    btn.textContent = originalText;
+                    btn.style.background = originalBg;
+                    btn.style.borderColor = originalBorder;
+                    btn.disabled = false;
                 }}
             }} catch(e) {{
                 alert('Error saving configuration: ' + e);
+                btn.textContent = originalText;
+                btn.style.background = originalBg;
+                btn.style.borderColor = originalBorder;
+                btn.disabled = false;
             }}
         }}
 
