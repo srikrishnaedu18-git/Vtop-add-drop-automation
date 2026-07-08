@@ -83,6 +83,7 @@ MODIFY         = os.getenv("MODIFY", os.getenv("MODIFY_ENABLED", "false")).lower
 CHOSEN_FACULTY = os.getenv("CHOSEN_FACULTY", "").strip()
 CHOSEN_SLOT    = os.getenv("CHOSEN_SLOT", "").strip()
 PRINT_SCRAPER_DATA = os.getenv("print_scrapper_data_in_terminal", "false").lower() == "true"
+BLUR = os.getenv("BLUR", "false").lower() == "true"
 
 SCRAPER_STATUS = {
     "status": "Initializing...",
@@ -1389,6 +1390,14 @@ async def dashboard():
             @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.4; }} }}
             code {{ background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
 
+            /* Blur active styles for hiding sensitive info when posting on LinkedIn */
+            .blur-active .blur-sensitive-faculty:not(:focus) {{
+                filter: blur(5px);
+            }}
+            .blur-active .blur-sensitive-phone:not(:focus) {{
+                filter: blur(5px);
+            }}
+
             /* Pipeline Flow layout (AWS Glue/CodePipeline Style) */
             .pipeline-container {{
                 display: flex;
@@ -1825,7 +1834,7 @@ async def dashboard():
             }}
         </style>
     </head>
-    <body>
+    <body class="{'blur-active' if BLUR else ''}">
         <div class="container">
             <header>
                 <h1>FALL SEMESTER ADD/DROP 2026-27</h1>
@@ -1964,7 +1973,7 @@ async def dashboard():
                     <div class="form-group-row">
                         <div class="form-group">
                             <label for="modal-faculty">Faculty Preference (Keyword)</label>
-                            <input type="text" id="modal-faculty" placeholder="e.g. PRABHU J (Optional)">
+                            <input type="text" id="modal-faculty" class="blur-sensitive-faculty" placeholder="e.g. PRABHU J (Optional)">
                         </div>
                         <div class="form-group">
                             <label for="modal-slot">Slot Preference (Pattern)</label>
@@ -2003,6 +2012,15 @@ async def dashboard():
                             <div class="env-key">DISPLAY_NAME</div>
                             <div class="env-val-container">
                                 <input type="text" id="env-display-name" placeholder="Enter Display Name (e.g. Sri Krishna R)">
+                            </div>
+                        </div>
+                        <div class="env-row" style="margin-top: 10px;">
+                            <div class="env-key">BLUR (LinkedIn Anonymize)</div>
+                            <div class="env-val-container">
+                                <select id="env-blur" style="width: 100%;">
+                                    <option value="false">DISABLED</option>
+                                    <option value="true">ENABLED (Blur Faculty & Phone)</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -2100,7 +2118,7 @@ async def dashboard():
                         <div class="env-row">
                             <div class="env-key">MY_PHONE_NUMBER</div>
                             <div class="env-val-container">
-                                <input type="text" id="env-twilio-to" placeholder="whatsapp:+91XXXXXXXXXX">
+                                <input type="text" id="env-twilio-to" class="blur-sensitive-phone" placeholder="whatsapp:+91XXXXXXXXXX">
                             </div>
                         </div>
                     </div>
@@ -2221,7 +2239,7 @@ async def dashboard():
             tbody.innerHTML = courseSeats.map(s => `
                 <tr>
                     <td><code>${{s.slot||'-'}}</code></td>
-                    <td>${{s.faculty||'-'}}</td>
+                    <td><span class="blur-sensitive-faculty">${{s.faculty||'-'}}</span></td>
                     <td class='${{avail_class(s.available)}}'>${{s.available||'-'}}</td>
                     <td style='color:var(--text-secondary);font-size:13px;'>${{s.timestamp||'-'}}</td>
                 </tr>`).join('');
@@ -2255,7 +2273,7 @@ async def dashboard():
                     <td style='color:var(--text-secondary);font-size:13px;'>${{l.timestamp||'-'}}</td>
                     <td>${{l.course_name||'-'}}</td>
                     <td><code>${{l.slot||'-'}}</code></td>
-                    <td>${{l.faculty||'-'}}</td>
+                    <td><span class="blur-sensitive-faculty">${{l.faculty||'-'}}</span></td>
                     <td class='${{avail_class(l.available)}}'>${{l.available||'-'}}</td>
                     <td>${{badge}}</td>
                 </tr>`;
@@ -2285,7 +2303,28 @@ async def dashboard():
                 return;
             }}
             container.innerHTML = logs.map(l => {{
-                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{l.message}}</div>`;
+                let cleanedMsg = l.message;
+                if (document.body.classList.contains('blur-active')) {{
+                    // 1. Blur phone number patterns: e.g. +919080014281 or 9080014281
+                    cleanedMsg = cleanedMsg.replace(/\+?91\d{10}\b|\b\d{10}\b/g, '<span class="blur-sensitive-phone">$&</span>');
+                    
+                    // 2. Blur Faculty pattern in logs
+                    cleanedMsg = cleanedMsg.replace(/(Faculty:\s*)([^|\n\r]+)/g, (m, p1, p2) => {{
+                        return p1 + '<span class="blur-sensitive-faculty">' + p2 + '</span>';
+                    }});
+                    
+                    // 3. Blur target faculties from configCourses
+                    if (typeof configCourses !== 'undefined' && configCourses.length) {{
+                        configCourses.forEach(c => {{
+                            if (c.target_faculty && c.target_faculty.trim().length > 2) {{
+                                const facEscaped = c.target_faculty.replace(/[-\/\\^$*+?.()|[\]{{}}]/g, '\\$&');
+                                const facRegex = new RegExp('\\b' + facEscaped + '\\b', 'gi');
+                                cleanedMsg = cleanedMsg.replace(facRegex, '<span class="blur-sensitive-faculty">$&</span>');
+                            }}
+                        }});
+                    }}
+                }}
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${cleanedMsg}</div>`;
             }}).join('');
             
             // Auto scroll to bottom
@@ -2341,7 +2380,7 @@ async def dashboard():
                         <div class="pipeline-card-title">${{c.keyword || 'Unnamed Course'}}</div>
                         <div class="pipeline-card-details">
                             <strong>Category:</strong> ${{c.category || 'DE'}} (Page ${{c.page || 1}})<br>
-                            <strong>Faculty:</strong> ${{c.target_faculty || 'Any'}}<br>
+                            <strong>Faculty:</strong> <span class="blur-sensitive-faculty">${{c.target_faculty || 'Any'}}</span><br>
                             <strong>Slot:</strong> ${{c.target_slot || 'Any'}}
                         </div>
                     </div>
@@ -2541,6 +2580,9 @@ async def dashboard():
             try {{
                 const res = await fetch('/api/data?t=' + Date.now());
                 const data = await res.json();
+                if (data.courses_config) {{
+                    configCourses = data.courses_config;
+                }}
                 render_status(data.status);
                 render_seats(data.seats);
                 render_logs(data.logs);
@@ -2579,6 +2621,7 @@ async def dashboard():
                 document.getElementById('env-register-enabled').value = env.REGISTER || 'false';
                 document.getElementById('env-modify-enabled').value = env.MODIFY || 'false';
                 document.getElementById('env-print-terminal').value = env.print_scrapper_data_in_terminal || 'false';
+                document.getElementById('env-blur').value = env.BLUR || 'false';
                 
                 document.getElementById('env-modal').style.display = 'flex';
             }} catch(e) {{
@@ -2618,7 +2661,8 @@ async def dashboard():
                 MONITOR_DELAY_SECONDS: document.getElementById('env-monitor-delay').value.trim(),
                 REGISTER: document.getElementById('env-register-enabled').value,
                 MODIFY: document.getElementById('env-modify-enabled').value,
-                print_scrapper_data_in_terminal: document.getElementById('env-print-terminal').value
+                print_scrapper_data_in_terminal: document.getElementById('env-print-terminal').value,
+                BLUR: document.getElementById('env-blur').value
             }};
 
             try {{
@@ -2723,7 +2767,7 @@ async def get_env_config():
         "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
         "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
         "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
-        "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
+        "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR"
     ]
     
     res = {}
@@ -2744,7 +2788,7 @@ async def get_env_config():
 @app.post("/api/env")
 async def save_env_config(request: Request):
     global USERNAME, PASSWORD, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, MY_PHONE_NUMBER
-    global MONITOR_DELAY_SECONDS, REGISTER, MODIFY, PRINT_SCRAPER_DATA
+    global MONITOR_DELAY_SECONDS, REGISTER, MODIFY, PRINT_SCRAPER_DATA, BLUR
     from fastapi.responses import JSONResponse
     try:
         data = await request.json()
@@ -2753,7 +2797,7 @@ async def save_env_config(request: Request):
             "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
             "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
             "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
-            "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
+            "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR"
         ]
         
         for k in keys:
@@ -2786,6 +2830,8 @@ async def save_env_config(request: Request):
             MODIFY = updates["MODIFY"].lower() == "true"
         if "print_scrapper_data_in_terminal" in updates:
             PRINT_SCRAPER_DATA = updates["print_scrapper_data_in_terminal"].lower() == "true"
+        if "BLUR" in updates:
+            BLUR = updates["BLUR"].lower() == "true"
             
         for k, v in updates.items():
             os.environ[k] = v
