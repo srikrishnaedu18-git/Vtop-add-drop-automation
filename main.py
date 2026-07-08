@@ -1096,9 +1096,9 @@ def get_dashboard_status():
     if not last_run:
         last_run = "-"
         
-    status_text = "Active"
+    status_text = "Active 🚀"
     if SCRAPER_STATUS.get("status") == "Crashed ❌":
-        status_text = "Crashed"
+        status_text = "Crashed ❌"
         
     error = SCRAPER_STATUS.get("error")
     
