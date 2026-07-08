@@ -100,12 +100,28 @@ REGISTER_COURSES = parse_env_list(os.getenv("REGISTER_COURSES", ""))
 MODIFY_COURSES   = parse_env_list(os.getenv("MODIFY_COURSES", ""))
 
 
-# Add more dictionaries here to scrape multiple subjects sequentially!
-try:
-    COURSES_TO_MONITOR = json.loads(os.getenv("COURSES_TO_MONITOR", "[]"))
-except Exception as e:
-    print(f"Error parsing COURSES_TO_MONITOR from .env: {e}")
-    COURSES_TO_MONITOR = []
+CONFIG_JSON_PATH = "monitored_courses.json"
+COURSES_TO_MONITOR = []
+
+def load_courses_config():
+    global COURSES_TO_MONITOR
+    if os.path.exists(CONFIG_JSON_PATH):
+        try:
+            with open(CONFIG_JSON_PATH, "r") as f:
+                COURSES_TO_MONITOR = json.load(f)
+                print(f"[Config] Loaded {len(COURSES_TO_MONITOR)} courses from {CONFIG_JSON_PATH}")
+                return
+        except Exception as e:
+            print(f"Error loading {CONFIG_JSON_PATH}: {e}")
+            
+    try:
+        COURSES_TO_MONITOR = json.loads(os.getenv("COURSES_TO_MONITOR", "[]"))
+        print(f"[Config] Loaded {len(COURSES_TO_MONITOR)} courses from .env")
+    except Exception as e:
+        print(f"Error parsing COURSES_TO_MONITOR from .env: {e}")
+        COURSES_TO_MONITOR = []
+
+load_courses_config()
 
 # Twilio Config
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
@@ -902,7 +918,11 @@ async def run():
                     if not await navigate_to_course(page, course_config):
                         raise Exception("Failed to navigate to course. Session likely expired.")
 
+                    current_config_snapshot = json.dumps(COURSES_TO_MONITOR)
                     while True:
+                        if json.dumps(COURSES_TO_MONITOR) != current_config_snapshot:
+                            print("[Config] Courses configuration changed! Exiting inner loop to reload...")
+                            break
                         print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
                         
                         msg_data = await scrape_and_format(page, keyword)
@@ -968,7 +988,11 @@ async def run():
 
                 else:
                     # ── Multi-Course Sequential Loop (Default behavior) ──
+                    current_config_snapshot = json.dumps(COURSES_TO_MONITOR)
                     while True:
+                        if json.dumps(COURSES_TO_MONITOR) != current_config_snapshot:
+                            print("[Config] Courses configuration changed! Exiting inner loop to reload...")
+                            break
                         print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
                         
                         for course_config in COURSES_TO_MONITOR:
@@ -1047,8 +1071,8 @@ async def run():
 # ─── FastAPI Web Server (For Render.com) ──────────────────────────────────────
 
 try:
-    from fastapi import FastAPI
-    from fastapi.responses import HTMLResponse
+    from fastapi import FastAPI, Request
+    from fastapi.responses import HTMLResponse, JSONResponse
     from contextlib import asynccontextmanager
 except ImportError:
     pass
@@ -1123,6 +1147,7 @@ async def dashboard():
     mode_text = "Multi-Course Sequential" if len(COURSES_TO_MONITOR) > 1 else "Single-Course Optimized"
     register_switch = "ENABLED (True)" if REGISTER else "DISABLED (False)"
     modify_switch = "ENABLED (True)" if MODIFY else "DISABLED (False)"
+    subjects_list = "<br>".join([f"• {c['keyword']}" for c in COURSES_TO_MONITOR]) if COURSES_TO_MONITOR else "None"
     
     # Generate latest seat rows
     current_seats = get_latest_status_by_slot()
@@ -1267,29 +1292,74 @@ async def dashboard():
                 </div>
                 <div class="card">
                     <h2>Monitoring Config</h2>
-                    <div style="font-size:14px;line-height:1.8;">
+                    <div style="font-size:14px;line-height:1.6;">
                         <strong>Mode:</strong> {mode_text}<br>
                         <strong>Interval:</strong> {MONITOR_DELAY_SECONDS}s<br>
                         <strong>REGISTER:</strong> {register_switch}<br>
-                        <strong>MODIFY:</strong> {modify_switch}
+                        <strong>MODIFY:</strong> {modify_switch}<br>
+                        <div style="margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                            <strong>Monitored:</strong><br>
+                            <span id="monitoring-subjects-list" style="color: var(--accent-color); font-size: 13px;">{subjects_list}</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="card" style="margin-bottom:30px;">
-                <h2>Live Seat Status <span class="pulse" style="color:#3fb950;font-size:10px;">● LIVE</span></h2>
+                <h2>Monitor Settings (Course Configuration)</h2>
+                <div style="overflow-x: auto; margin-bottom: 15px;">
+                    <table id="config-table" style="min-width: 800px; margin-top:0;">
+                        <thead>
+                            <tr>
+                                <th>Subject Keyword</th>
+                                <th>Category</th>
+                                <th>Action</th>
+                                <th>Faculty Preference</th>
+                                <th>Slot Preference</th>
+                                <th>Page</th>
+                                <th style="width: 80px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="config-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="addConfigRow()" style="background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.25); color: #58a6ff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='rgba(88,166,255,0.18)'" onmouseout="this.style.background='rgba(88,166,255,0.1)'">+ Add New Subject</button>
+                    <button onclick="saveConfigToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='#2ea44f'" onmouseout="this.style.background='#238636'">Apply & Save Config</button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <h2 style="margin:0; font-size: 16px; color: var(--text-secondary); font-weight: 500;">Live Seat Status <span class="pulse" style="color:#3fb950;font-size:10px;">● LIVE</span></h2>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <button onclick="prevCourse()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">&larr;</button>
+                        <span id="current-course-title" style="font-weight: 600; color: #58a6ff; font-size: 14px; background: rgba(88,166,255,0.1); padding: 4px 10px; border-radius: 20px;">Loading subject...</span>
+                        <button onclick="nextCourse()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">&rarr;</button>
+                    </div>
+                </div>
                 <table>
-                    <thead><tr><th>Course</th><th>Slot</th><th>Faculty</th><th>Available Seats</th><th>Last Updated</th></tr></thead>
-                    <tbody id="seats-tbody">{current_seats_rows}</tbody>
+                    <thead><tr><th>Slot</th><th>Faculty</th><th>Available Seats</th><th>Last Updated</th></tr></thead>
+                    <tbody id="seats-tbody">
+                        <tr><td colspan='4' style='text-align:center;color:var(--text-secondary)'>Loading...</td></tr>
+                    </tbody>
                 </table>
             </div>
 
             <div class="card" style="margin-bottom:30px;">
-                <h2>Activity Log (Last 30)</h2>
-                <table>
-                    <thead><tr><th>Timestamp</th><th>Course</th><th>Slot</th><th>Faculty</th><th>Available</th><th>Changed?</th></tr></thead>
-                    <tbody id="logs-tbody">{log_rows}</tbody>
-                </table>
+                <h2>Activity Log (Last 100)</h2>
+                <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                    <table style="margin-top:0; width: 100%;">
+                        <thead style="position: sticky; top: 0; background: #161b22; z-index: 10; border-bottom: 2px solid var(--border-color);">
+                            <tr><th>Timestamp</th><th>Course</th><th>Slot</th><th>Faculty</th><th>Available</th><th>Changed?</th></tr>
+                        </thead>
+                        <tbody id="logs-tbody">
+                            {log_rows}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="card">
@@ -1310,20 +1380,69 @@ async def dashboard():
             return ['full','0','-'].includes(v.toLowerCase()) ? 'avail-full' : 'avail-open';
         }}
 
+        let allSeats = [];
+        let currentCourseIndex = 0;
+        let configCourses = [];
+        let isConfigLoaded = false;
+
+        function group_seats_by_course(seats) {{
+            const groups = {{}};
+            seats.forEach(s => {{
+                const c = s.course_name || 'Unknown';
+                if (!groups[c]) groups[c] = [];
+                groups[c].push(s);
+            }});
+            return groups;
+        }}
+
         function render_seats(seats) {{
+            allSeats = seats || [];
+            const groups = group_seats_by_course(allSeats);
+            const keys = Object.keys(groups);
+            
+            const titleEl = document.getElementById('current-course-title');
             const tbody = document.getElementById('seats-tbody');
-            if (!seats || !seats.length) {{
-                tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:var(--text-secondary)'>No data yet.</td></tr>";
+            
+            if (!keys.length) {{
+                tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;color:var(--text-secondary)'>No seat data yet.</td></tr>";
+                titleEl.textContent = "None";
                 return;
             }}
-            tbody.innerHTML = seats.map(s => `
+            
+            if (currentCourseIndex >= keys.length) {{
+                currentCourseIndex = 0;
+            }}
+            if (currentCourseIndex < 0) {{
+                currentCourseIndex = keys.length - 1;
+            }}
+            
+            const activeCourse = keys[currentCourseIndex];
+            titleEl.textContent = activeCourse;
+            
+            const courseSeats = groups[activeCourse];
+            tbody.innerHTML = courseSeats.map(s => `
                 <tr>
-                    <td class='highlight'>${{s.course_name||'Unknown'}}</td>
                     <td><code>${{s.slot||'-'}}</code></td>
                     <td>${{s.faculty||'-'}}</td>
                     <td class='${{avail_class(s.available)}}'>${{s.available||'-'}}</td>
                     <td style='color:var(--text-secondary);font-size:13px;'>${{s.timestamp||'-'}}</td>
                 </tr>`).join('');
+        }}
+
+        window.prevCourse = function() {{
+            const groups = group_seats_by_course(allSeats);
+            const keys = Object.keys(groups);
+            if (!keys.length) return;
+            currentCourseIndex = (currentCourseIndex - 1 + keys.length) % keys.length;
+            render_seats(allSeats);
+        }}
+
+        window.nextCourse = function() {{
+            const groups = group_seats_by_course(allSeats);
+            const keys = Object.keys(groups);
+            if (!keys.length) return;
+            currentCourseIndex = (currentCourseIndex + 1) % keys.length;
+            render_seats(allSeats);
         }}
 
         function render_logs(logs) {{
@@ -1355,7 +1474,7 @@ async def dashboard():
             
             let displayVal = s;
             if (status.error) {{
-                displayVal += ` <span style='font-size: 14px; font-weight: normal; color: var(--danger-color);'>(${{status.error}})</span>`;
+                displayVal += ` <span style='font-size: 14px; font-weight: normal; color: var(--danger-color);'>(${status.error})</span>`;
             }}
             val.innerHTML = displayVal;
             run.textContent = status.last_run||'Never';
@@ -1368,11 +1487,93 @@ async def dashboard():
                 return;
             }}
             container.innerHTML = logs.map(l => {{
-                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{l.message}}</div>`;
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${l.timestamp}]</span> ${l.message}</div>`;
             }}).join('');
             
             // Auto scroll to bottom
             container.scrollTop = container.scrollHeight;
+        }}
+
+        function render_config_table(courses) {{
+            configCourses = courses || [];
+            
+            // Dynamically update the subjects list in the Monitoring Config card
+            const listEl = document.getElementById('monitoring-subjects-list');
+            if (listEl) {{
+                listEl.innerHTML = configCourses.length 
+                    ? configCourses.map(c => `• ${{c.keyword || 'New Subject'}}`).join('<br>')
+                    : 'None';
+            }}
+            
+            const tbody = document.getElementById('config-tbody');
+            if (!configCourses.length) {{
+                tbody.innerHTML = "<tr><td colspan='7' style='text-align:center;color:var(--text-secondary)'>No subjects configured. Add one below.</td></tr>";
+                return;
+            }}
+            
+            tbody.innerHTML = configCourses.map((c, idx) => `
+                <tr>
+                    <td><input type="text" value="${{c.keyword||''}}" onchange="updateConfigField(${{idx}}, 'keyword', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
+                    <td><input type="text" value="${{c.category||'DE'}}" onchange="updateConfigField(${{idx}}, 'category', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
+                    <td>
+                        <select onchange="updateConfigField(${{idx}}, 'action', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;">
+                            <option value="modify" ${{c.action === 'modify' ? 'selected' : ''}}>Modify</option>
+                            <option value="register" ${{c.action === 'register' ? 'selected' : ''}}>Register</option>
+                            <option value="monitor" ${{c.action === 'monitor' ? 'selected' : ''}}>Monitor Only</option>
+                        </select>
+                    </td>
+                    <td><input type="text" value="${{c.target_faculty||''}}" placeholder="Any" onchange="updateConfigField(${{idx}}, 'target_faculty', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
+                    <td><input type="text" value="${{c.target_slot||''}}" placeholder="Any" onchange="updateConfigField(${{idx}}, 'target_slot', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
+                    <td><input type="number" value="${{c.page||1}}" onchange="updateConfigField(${{idx}}, 'page', parseInt(this.value)||1)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
+                    <td style="text-align: center;">
+                        <button onclick="deleteConfigRow(${{idx}})" style="background:rgba(218,54,55,0.15); border:1px solid rgba(218,54,55,0.3); color:#ff6b6b; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; transition:0.2s;" onmouseover="this.style.background='rgba(218,54,55,0.25)'" onmouseout="this.style.background='rgba(218,54,55,0.15)'">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }}
+
+        window.updateConfigField = function(idx, field, val) {{
+            if (configCourses[idx]) {{
+                configCourses[idx][field] = val;
+            }}
+        }}
+
+        window.addConfigRow = function() {{
+            configCourses.push({{
+                keyword: "",
+                category: "DE",
+                action: "modify",
+                target_faculty: "",
+                target_slot: "",
+                page: 1
+            }});
+            render_config_table(configCourses);
+        }}
+
+        window.deleteConfigRow = function(idx) {{
+            configCourses.splice(idx, 1);
+            render_config_table(configCourses);
+        }}
+
+        window.saveConfigToServer = async function() {{
+            try {{
+                const res = await fetch('/api/config', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json'
+                    }},
+                    body: JSON.stringify(configCourses)
+                }});
+                const resData = await res.json();
+                if (resData.status === 'success') {{
+                    alert('Settings updated successfully! The scraper will reload the configuration on its next loop.');
+                    refresh();
+                }} else {{
+                    alert('Failed to update config: ' + resData.message);
+                }}
+            }} catch(e) {{
+                alert('Error saving configuration: ' + e);
+            }}
         }}
 
         async function refresh() {{
@@ -1383,6 +1584,11 @@ async def dashboard():
                 render_seats(data.seats);
                 render_logs(data.logs);
                 render_terminal_logs(data.terminal_logs);
+
+                if (!isConfigLoaded && data.courses_config) {{
+                    render_config_table(data.courses_config);
+                    isConfigLoaded = true;
+                }}
             }} catch(e) {{ console.warn('Refresh failed', e); }}
             countdown = REFRESH_INTERVAL / 1000;
         }}
@@ -1408,9 +1614,30 @@ async def api_data():
     return JSONResponse({
         "status": SCRAPER_STATUS,
         "seats": current_seats,
-        "logs": logs[:30],
+        "logs": logs[:100],
         "terminal_logs": GLOBAL_LOG_BUFFER,
+        "courses_config": COURSES_TO_MONITOR,
     })
+
+@app.post("/api/config")
+async def save_config(request: Request):
+    global COURSES_TO_MONITOR
+    try:
+        data = await request.json()
+        if not isinstance(data, list):
+            return JSONResponse({"status": "error", "message": "Config must be a list of courses"}, status_code=400)
+        
+        # Save to JSON config file
+        with open(CONFIG_JSON_PATH, "w") as f:
+            json.dump(data, f, indent=4)
+        
+        # Update in-memory configuration immediately
+        COURSES_TO_MONITOR = data
+        print(f"[Config] Dynamic configuration updated via dashboard. Total courses: {len(COURSES_TO_MONITOR)}")
+        return JSONResponse({"status": "success", "message": "Config updated successfully"})
+    except Exception as e:
+        print(f"Error saving dynamic config: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 if __name__ == "__main__":
     if os.getenv("PORT") or os.getenv("RUN_WEB"):
