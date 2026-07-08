@@ -1451,7 +1451,7 @@ async def dashboard():
             .pipeline-card-title {{
                 font-weight: 700;
                 font-size: 14px;
-                color: #fff;
+                color: var(--text-primary);
                 margin-bottom: 8px;
                 white-space: nowrap;
                 overflow: hidden;
