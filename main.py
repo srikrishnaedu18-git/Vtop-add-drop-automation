@@ -2325,32 +2325,42 @@ async def dashboard():
                 container.innerHTML = "<div style='color:#8b949e;'>Waiting for console logs...</div>";
                 return;
             }}
+            const blurActive = document.body.classList.contains('blur-active');
             container.innerHTML = logs.map(l => {{
-                let cleanedMsg = l.message;
-                if (document.body.classList.contains('blur-active')) {{
-                    // 1. Blur phone number patterns: e.g. +919080014281 or 9080014281
-                    cleanedMsg = cleanedMsg.replace(/\+?91\d{10}\b|\b\d{10}\b/g, '<span class="blur-sensitive-phone">$&</span>');
-                    
-                    // 2. Blur Faculty pattern in logs
-                    cleanedMsg = cleanedMsg.replace(/(Faculty:\s*)([^|\n\r]+)/g, (m, p1, p2) => {{
-                        return p1 + '<span class="blur-sensitive-faculty">' + p2 + '</span>';
-                    }});
-                    
-                    // 3. Blur target faculties from configCourses
-                    if (typeof configCourses !== 'undefined' && configCourses.length) {{
+                let msg = l.message;
+                if (blurActive) {{
+                    // Blur text following "Faculty:" label up to the next pipe or end of line
+                    const facIdx = msg.indexOf('Faculty:');
+                    if (facIdx !== -1) {{
+                        const beforeFac = msg.substring(0, facIdx + 8);
+                        const afterFac = msg.substring(facIdx + 8);
+                        const pipeIdx = afterFac.indexOf('|');
+                        const facText = pipeIdx !== -1 ? afterFac.substring(0, pipeIdx) : afterFac;
+                        const rest = pipeIdx !== -1 ? afterFac.substring(pipeIdx) : '';
+                        msg = beforeFac + '<span class="blur-sensitive-faculty">' + facText + '</span>' + rest;
+                    }}
+                    // Blur known target faculty names from config (simple indexOf)
+                    if (typeof configCourses !== 'undefined') {{
                         configCourses.forEach(c => {{
                             if (c.target_faculty && c.target_faculty.trim().length > 2) {{
-                                const facEscaped = c.target_faculty.replace(/[-\/\\^$*+?.()|[\]{{}}]/g, '\\$&');
-                                const facRegex = new RegExp('\\b' + facEscaped + '\\b', 'gi');
-                                cleanedMsg = cleanedMsg.replace(facRegex, '<span class="blur-sensitive-faculty">$&</span>');
+                                const fac = c.target_faculty.trim();
+                                const lowerFac = fac.toLowerCase();
+                                let searchFrom = 0;
+                                while (true) {{
+                                    const idx = msg.toLowerCase().indexOf(lowerFac, searchFrom);
+                                    if (idx === -1) break;
+                                    const before = msg.substring(0, idx);
+                                    const matched = msg.substring(idx, idx + fac.length);
+                                    const after = msg.substring(idx + fac.length);
+                                    msg = before + '<span class="blur-sensitive-faculty">' + matched + '</span>' + after;
+                                    searchFrom = before.length + 50 + matched.length;
+                                }}
                             }}
                         }});
                     }}
                 }}
-                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{cleanedMsg}}</div>`;
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{msg}}</div>`;
             }}).join('');
-            
-            // Auto scroll to bottom
             container.scrollTop = container.scrollHeight;
         }}
 
