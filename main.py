@@ -1077,6 +1077,37 @@ try:
 except ImportError:
     pass
 
+def get_absolute_latest_scraped_time():
+    if not os.path.exists(DB_PATH):
+        return None
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT timestamp FROM seat_logs ORDER BY timestamp DESC LIMIT 1")
+            row = cursor.fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        print(f"DB Read Error: {e}")
+        return None
+
+def get_dashboard_status():
+    db_last_run = get_absolute_latest_scraped_time()
+    last_run = db_last_run if db_last_run else SCRAPER_STATUS.get("last_run")
+    if not last_run:
+        last_run = "-"
+        
+    status_text = "Active"
+    if SCRAPER_STATUS.get("status") == "Crashed ❌":
+        status_text = "Crashed"
+        
+    error = SCRAPER_STATUS.get("error")
+    
+    return {
+        "status": status_text,
+        "last_run": last_run,
+        "error": error
+    }
+
 def get_latest_status_by_slot():
     if not os.path.exists(DB_PATH):
         return []
@@ -1129,9 +1160,10 @@ app = FastAPI(lifespan=lifespan)
 
 @app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def dashboard():
-    status_text = SCRAPER_STATUS["status"]
-    last_run = SCRAPER_STATUS["last_run"]
-    error = SCRAPER_STATUS["error"]
+    d_status = get_dashboard_status()
+    status_text = d_status["status"]
+    last_run = d_status["last_run"]
+    error = d_status["error"]
     
     badge_class = "badge-sleeping"
     if "Active" in status_text:
@@ -2639,7 +2671,7 @@ async def api_data():
     current_seats = get_latest_status_by_slot()
     logs = get_recent_transitions()
     return JSONResponse({
-        "status": SCRAPER_STATUS,
+        "status": get_dashboard_status(),
         "seats": current_seats,
         "logs": logs[:100],
         "terminal_logs": GLOBAL_LOG_BUFFER,
