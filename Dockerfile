@@ -1,5 +1,5 @@
 # Use official Playwright Python image which has python, browsers, and all system packages pre-installed
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.61.0-jammy
 
 # Set python environment variables
 ENV PYTHONUNBUFFERED=1
