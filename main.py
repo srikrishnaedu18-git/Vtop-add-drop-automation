@@ -27,6 +27,12 @@ try:
 except ImportError:
     pass
 
+def get_ist_now():
+    from datetime import datetime, timedelta, timezone
+    utc_now = datetime.now(timezone.utc)
+    ist_now = utc_now + timedelta(hours=5, minutes=30)
+    return ist_now.replace(tzinfo=None)
+
 # ─── Live Log Console Redirection ─────────────────────────────────────────────
 GLOBAL_LOG_BUFFER = []
 
@@ -41,7 +47,7 @@ class LiveLogWriter:
         for line in lines:
             cleaned = line.strip()
             if cleaned:
-                ts = datetime.now().strftime("%H:%M:%S")
+                ts = get_ist_now().strftime("%H:%M:%S")
                 self.log_buffer.append({"timestamp": ts, "message": cleaned})
                 if len(self.log_buffer) > 100:
                     self.log_buffer.pop(0)
@@ -534,7 +540,7 @@ async def scrape_and_format(page, keyword: str = None) -> str | None:
         return None
 
     # ── Format WhatsApp message ──
-    now = datetime.now().strftime("%d-%m %H:%M:%S")
+    now = get_ist_now().strftime("%d-%m %H:%M:%S")
     lines = [
         f"📚 *{course_name or 'Unknown Course'}*",
         f"🕐 Scraped: {now}",
@@ -578,7 +584,7 @@ async def scrape_and_format(page, keyword: str = None) -> str | None:
 LAST_HOURLY_SENT = {}
 
 def format_all_slots_msg(course_name: str, slots: list) -> str:
-    now = datetime.now().strftime("%d-%m %H:%M:%S")
+    now = get_ist_now().strftime("%d-%m %H:%M:%S")
     lines = [
         f"📚 *{course_name or 'Unknown Course'}* (Hourly Update)",
         f"🕐 Scraped: {now}",
@@ -787,7 +793,7 @@ async def check_and_trigger_registration(page, course_config: dict, course_name:
 
         await page.screenshot(path="registration_result.png")
 
-        now_str = datetime.now().strftime("%d-%m %H:%M:%S")
+        now_str = get_ist_now().strftime("%d-%m %H:%M:%S")
         success_msg = (
             f"🎉 *Course Registration Successful!*\n"
             f"📚 Course: {course_name}\n"
@@ -848,7 +854,7 @@ async def check_and_trigger_registration(page, course_config: dict, course_name:
 
         await page.screenshot(path="modification_result.png")
 
-        now_str = datetime.now().strftime("%d-%m %H:%M:%S")
+        now_str = get_ist_now().strftime("%d-%m %H:%M:%S")
         success_msg = (
             f"🎉 *Course Modification Successful!*\n"
             f"📚 Course: {course_name}\n"
@@ -890,7 +896,7 @@ async def run():
         
         while True:
             SCRAPER_STATUS["status"] = "Active 🚀"
-            SCRAPER_STATUS["last_run"] = datetime.now().strftime("%d-%m %H:%M:%S")
+            SCRAPER_STATUS["last_run"] = get_ist_now().strftime("%d-%m %H:%M:%S")
             SCRAPER_STATUS["error"] = None
             print("\n" + "═" * 60)
             print("[SESSION START] Starting new browser context...")
@@ -923,7 +929,7 @@ async def run():
                         if json.dumps(COURSES_TO_MONITOR) != current_config_snapshot:
                             print("[Config] Courses configuration changed! Exiting inner loop to reload...")
                             break
-                        print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
+                        print(f"\n[--- Monitoring Iteration @ {get_ist_now().strftime('%H:%M:%S')} ---]")
                         
                         msg_data = await scrape_and_format(page, keyword)
                         if msg_data:
@@ -936,7 +942,7 @@ async def run():
                             init_db()
                             is_changed = check_and_save_db(course_name, slots)
 
-                            current_hour_str = datetime.now().strftime("%Y-%m-%d %H")
+                            current_hour_str = get_ist_now().strftime("%Y-%m-%d %H")
                             is_hourly = LAST_HOURLY_SENT.get(course_name) != current_hour_str
 
                             if is_hourly:
@@ -993,7 +999,7 @@ async def run():
                         if json.dumps(COURSES_TO_MONITOR) != current_config_snapshot:
                             print("[Config] Courses configuration changed! Exiting inner loop to reload...")
                             break
-                        print(f"\n[--- Monitoring Iteration @ {datetime.now().strftime('%H:%M:%S')} ---]")
+                        print(f"\n[--- Monitoring Iteration @ {get_ist_now().strftime('%H:%M:%S')} ---]")
                         
                         for course_config in COURSES_TO_MONITOR:
                             print(f"\n[>] Checking {course_config['category']}: {course_config['keyword']}")
@@ -1011,7 +1017,7 @@ async def run():
                                 init_db()
                                 is_changed = check_and_save_db(course_name, slots)
 
-                                current_hour_str = datetime.now().strftime("%Y-%m-%d %H")
+                                current_hour_str = get_ist_now().strftime("%Y-%m-%d %H")
                                 is_hourly = LAST_HOURLY_SENT.get(course_name) != current_hour_str
 
                                 if is_hourly:
