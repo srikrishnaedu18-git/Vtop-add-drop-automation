@@ -1719,7 +1719,7 @@ async def dashboard():
             
             let displayVal = s;
             if (status.error) {{
-                displayVal += ` <span style='font-size: 14px; font-weight: normal; color: var(--danger-color);'>(${status.error})</span>`;
+                displayVal += ` <span style='font-size: 14px; font-weight: normal; color: var(--danger-color);'>(${{status.error}})</span>`;
             }}
             val.innerHTML = displayVal;
             run.textContent = status.last_run||'Never';
@@ -1732,7 +1732,7 @@ async def dashboard():
                 return;
             }}
             container.innerHTML = logs.map(l => {{
-                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${l.timestamp}]</span> ${l.message}</div>`;
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{l.message}}</div>`;
             }}).join('');
             
             // Auto scroll to bottom
@@ -1869,7 +1869,7 @@ async def dashboard():
             // Prevent modal click from triggering if we are dragging
             if (dragSourceIndex !== null) return;
             
-            document.getElementById('modal-title').textContent = `Edit Step ${idx + 1}`;
+            document.getElementById('modal-title').textContent = `Edit Step ${{idx + 1}}`;
             document.getElementById('modal-course-index').value = idx;
             document.getElementById('modal-keyword').value = course.keyword || '';
             document.getElementById('modal-category').value = course.category || 'DE';
