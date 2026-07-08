@@ -2347,7 +2347,7 @@ async def dashboard():
                         }});
                     }}
                 }}
-                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${cleanedMsg}</div>`;
+                return `<div style="margin-bottom: 4px;"><span style="color:#8b949e;">[${{l.timestamp}}]</span> ${{cleanedMsg}}</div>`;
             }}).join('');
             
             // Auto scroll to bottom
