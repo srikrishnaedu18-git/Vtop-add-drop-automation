@@ -68,6 +68,18 @@ python tools/show_db.py
 ```
 
 
+## 🖥️ Web Interface & Live Dashboard
+
+The application features a lightweight, high-performance web interface built with FastAPI that acts as a real-time command center:
+
+*   **Interactive Course Configuration**: Update subjects to monitor directly from the web dashboard. Add new courses, set categories, page numbers, target slots/faculties, and choose actions (`modify` / `register` / `monitor`). Saving settings updates the memory configuration instantly and persists them to `monitored_courses.json`.
+*   **Live Seats Subject Slider**: Paginate through seat availability of different courses gracefully using the Left (`←`) and Right (`→`) slider controls.
+*   **Persistent & Dynamic Status**: Scraper status (Active/Sleeping/Crashed) and latest run timestamps render dynamically in real-time in your browser (utilizing cache-busting request parameters).
+*   **Scrollable Activity Log**: View up to 100 historical seat transition changes inside a neat, scrollable component with sticky table headers.
+*   **Live Console stream**: Stream stdout terminal output directly inside the dashboard.
+*   **Timezone Localization**: All timestamps on the dashboard, SQLite database logs, and notifications are formatted in Indian Standard Time (IST - Asia/Kolkata).
+
+
 ## ⚙️ Automated Workflows (Registration vs. Modification)
 
 The automation engine supports two distinct workflows running simultaneously. You can configure target actions, faculties, and slots on a per-course level directly within the `COURSES_TO_MONITOR` JSON array:
