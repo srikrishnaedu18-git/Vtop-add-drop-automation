@@ -84,6 +84,7 @@ CHOSEN_FACULTY = os.getenv("CHOSEN_FACULTY", "").strip()
 CHOSEN_SLOT    = os.getenv("CHOSEN_SLOT", "").strip()
 PRINT_SCRAPER_DATA = os.getenv("print_scrapper_data_in_terminal", "false").lower() == "true"
 BLUR = os.getenv("BLUR", "false").lower() == "true"
+WHATSAPP_ENABLED = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
 
 SCRAPER_STATUS = {
     "status": "Initializing...",
@@ -610,6 +611,10 @@ def format_all_slots_msg(course_name: str, slots: list) -> str:
 
 def send_whatsapp_alert(msg_text: str):
     """Sends the formatted text via Twilio WhatsApp sandbox."""
+    if not WHATSAPP_ENABLED:
+        print("\n[!] WhatsApp notifications are DISABLED (WHATSAPP_ENABLED=false). Skipping alert.")
+        return
+
     if not Client:
         print("\n[!] Twilio package not installed. Skipping WhatsApp alert.")
         return
@@ -2171,6 +2176,15 @@ async def dashboard():
                                 </select>
                             </div>
                         </div>
+                        <div class="env-row" style="margin-top: 10px;">
+                            <div class="env-key">WhatsApp Notifications</div>
+                            <div class="env-val-container">
+                                <select id="env-whatsapp-enabled" style="width: 100%;">
+                                    <option value="false">DISABLED (Off)</option>
+                                    <option value="true">ENABLED (On)</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     
                 </div>
@@ -2655,6 +2669,7 @@ async def dashboard():
                 document.getElementById('env-modify-enabled').value = env.MODIFY || 'false';
                 document.getElementById('env-print-terminal').value = env.print_scrapper_data_in_terminal || 'false';
                 document.getElementById('env-blur').value = env.BLUR || 'false';
+                document.getElementById('env-whatsapp-enabled').value = env.WHATSAPP_ENABLED || 'false';
                 
                 document.getElementById('env-modal').style.display = 'flex';
             }} catch(e) {{
@@ -2695,7 +2710,8 @@ async def dashboard():
                 REGISTER: document.getElementById('env-register-enabled').value,
                 MODIFY: document.getElementById('env-modify-enabled').value,
                 print_scrapper_data_in_terminal: document.getElementById('env-print-terminal').value,
-                BLUR: document.getElementById('env-blur').value
+                BLUR: document.getElementById('env-blur').value,
+                WHATSAPP_ENABLED: document.getElementById('env-whatsapp-enabled').value
             }};
 
             try {{
@@ -2800,7 +2816,7 @@ async def get_env_config():
         "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
         "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
         "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
-        "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR"
+        "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR", "WHATSAPP_ENABLED"
     ]
     
     res = {}
@@ -2821,7 +2837,7 @@ async def get_env_config():
 @app.post("/api/env")
 async def save_env_config(request: Request):
     global USERNAME, PASSWORD, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, MY_PHONE_NUMBER
-    global MONITOR_DELAY_SECONDS, REGISTER, MODIFY, PRINT_SCRAPER_DATA, BLUR
+    global MONITOR_DELAY_SECONDS, REGISTER, MODIFY, PRINT_SCRAPER_DATA, BLUR, WHATSAPP_ENABLED
     from fastapi.responses import JSONResponse
     try:
         data = await request.json()
@@ -2830,7 +2846,7 @@ async def save_env_config(request: Request):
             "DISPLAY_NAME", "VTOP_USERNAME", "VTOP_PASSWORD",
             "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
             "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
-            "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR"
+            "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal", "BLUR", "WHATSAPP_ENABLED"
         ]
         
         for k in keys:
@@ -2865,6 +2881,9 @@ async def save_env_config(request: Request):
             PRINT_SCRAPER_DATA = updates["print_scrapper_data_in_terminal"].lower() == "true"
         if "BLUR" in updates:
             BLUR = updates["BLUR"].lower() == "true"
+        if "WHATSAPP_ENABLED" in updates:
+            WHATSAPP_ENABLED = updates["WHATSAPP_ENABLED"].lower() == "true"
+            print(f"[Config] WhatsApp notifications {'ENABLED' if WHATSAPP_ENABLED else 'DISABLED'}")
             
         for k, v in updates.items():
             os.environ[k] = v
