@@ -1476,6 +1476,136 @@ async def dashboard():
             }}
             @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
             @keyframes slideUp {{ from {{ transform: translateY(20px); }} to {{ transform: translateY(0); }} }}
+
+            /* Profile & Environment Modal CSS */
+            .profile-trigger {{
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                padding: 4px 12px 4px 6px;
+                cursor: pointer;
+                transition: 0.2s;
+                user-select: none;
+                margin-left: 8px;
+            }}
+            .profile-trigger:hover {{
+                background: rgba(255, 255, 255, 0.1);
+                border-color: var(--accent-color);
+            }}
+            .profile-avatar {{
+                width: 24px;
+                height: 24px;
+                background: linear-gradient(135deg, #58a6ff, #bc8cff);
+                color: #fff;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: 700;
+            }}
+            .profile-name {{
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--text-primary);
+            }}
+            
+            /* Render-style Env Rows */
+            .env-row {{
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                margin-bottom: 12px;
+                background: rgba(255, 255, 255, 0.01);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                padding: 8px 12px;
+            }}
+            .env-key {{
+                flex: 0 0 200px;
+                font-family: monospace;
+                font-size: 13px;
+                color: var(--text-primary);
+                font-weight: 600;
+                word-break: break-all;
+            }}
+            .env-val-container {{
+                flex: 1;
+                position: relative;
+                display: flex;
+                align-items: center;
+            }}
+            .env-val-container input, .env-val-container select {{
+                width: 100%;
+                background: rgba(0, 0, 0, 0.25) !important;
+                border: 1px solid var(--border-color) !important;
+                border-radius: 4px !important;
+                color: #fff !important;
+                padding: 8px 32px 8px 10px !important;
+                font-size: 13px !important;
+                font-family: inherit !important;
+            }}
+            .env-val-container select {{
+                padding-right: 10px !important;
+            }}
+            .env-val-container input:focus {{
+                border-color: var(--accent-color) !important;
+                outline: none;
+            }}
+            .password-toggle-btn {{
+                position: absolute;
+                right: 8px;
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                cursor: pointer;
+                font-size: 16px;
+                padding: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }}
+            .password-toggle-btn:hover {{
+                color: #fff;
+            }}
+            
+            /* Accordion Help styles */
+            .help-toggle {{
+                background: none;
+                border: none;
+                color: var(--accent-color);
+                font-size: 12px;
+                cursor: pointer;
+                padding: 4px 0;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                font-weight: 500;
+                outline: none;
+            }}
+            .help-toggle:hover {{
+                text-decoration: underline;
+            }}
+            .help-content {{
+                background: rgba(255, 255, 255, 0.03);
+                border-left: 2px solid var(--accent-color);
+                padding: 10px 15px;
+                margin-top: 8px;
+                border-radius: 0 6px 6px 0;
+                font-size: 12px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }}
+            .help-content ol, .help-content ul {{
+                margin: 6px 0;
+                padding-left: 20px;
+            }}
+            .help-content li {{
+                margin-bottom: 4px;
+            }}
         </style>
     </head>
     <body>
@@ -1485,6 +1615,10 @@ async def dashboard():
                 <div class="header-right">
                     <span id="refresh-indicator">⟳ Auto-refresh: 10s</span>
                     <span id="status-badge" class="badge {badge_class}">{status_text}</span>
+                    <div class="profile-trigger" onclick="openEnvModal()">
+                        <div class="profile-avatar">SK</div>
+                        <span class="profile-name">Sri Krishna R</span>
+                    </div>
                 </div>
             </header>
 
@@ -1610,6 +1744,179 @@ async def dashboard():
                     <div style="display: flex; gap: 10px;">
                         <button onclick="closeModal()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Cancel</button>
                         <button onclick="saveModalCourse()" style="background: #58a6ff; border: 1px solid #388bfd; color: #fff; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Save Step</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Popup for Environment Settings -->
+        <div id="env-modal" class="modal-backdrop" style="display: none;">
+            <div class="modal-content" style="max-width: 650px;">
+                <div class="modal-header">
+                    <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block;"></span>
+                        System Environment Config (Sri Krishna R)
+                    </h3>
+                    <button onclick="closeEnvModal()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding: 20px;">
+                    
+                    <!-- VTOP Credentials Group -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">VTOP Credentials</h4>
+                            <button class="help-toggle" onclick="toggleHelp('vtop-help')">ⓘ Setup Help</button>
+                        </div>
+                        <div id="vtop-help" class="help-content" style="display:none; margin-bottom: 10px;">
+                            <p>Enter your VTOP login credentials used for add/drop portal access. <strong>Warning:</strong> Ensure they are entered correctly to prevent captcha solving failures or account locking.</p>
+                        </div>
+                        
+                        <div class="env-row">
+                            <div class="env-key">VTOP_USERNAME</div>
+                            <div class="env-val-container">
+                                <input type="text" id="env-vtop-username" placeholder="Enter VTOP Username">
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">VTOP_PASSWORD</div>
+                            <div class="env-val-container">
+                                <input type="password" id="env-vtop-password" placeholder="Enter VTOP Password">
+                                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('env-vtop-password')">👁</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gmail IMAP Group -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Gmail (OTP Extraction)</h4>
+                            <button class="help-toggle" onclick="toggleHelp('gmail-help')">ⓘ Setup Help</button>
+                        </div>
+                        <div id="gmail-help" class="help-content" style="display:none; margin-bottom: 10px;">
+                            <p>To let the script automatically parse and read VTOP OTP emails for slot modifications:</p>
+                            <ol>
+                                <li>Enable 2-Step Verification on your Gmail account.</li>
+                                <li>Go to your Google Account -> Security -> App Passwords.</li>
+                                <li>Create an App Password for "Other (Custom Name)" named VTOP Automation and copy the generated 16-character code.</li>
+                                <li>Paste it into GMAIL_APP_PASSWORD.</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="env-row">
+                            <div class="env-key">GMAIL_ADDRESS</div>
+                            <div class="env-val-container">
+                                <input type="email" id="env-gmail-address" placeholder="Enter Gmail Address">
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">GMAIL_APP_PASSWORD</div>
+                            <div class="env-val-container">
+                                <input type="password" id="env-gmail-app-password" placeholder="16-character Gmail App Password">
+                                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('env-gmail-app-password')">👁</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- WhatsApp Notifications Group -->
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">WhatsApp (Twilio API)</h4>
+                            <button class="help-toggle" onclick="toggleHelp('twilio-help')">ⓘ Setup Help</button>
+                        </div>
+                        <div id="twilio-help" class="help-content" style="display:none; margin-bottom: 10px;">
+                            <p>Configures Twilio API credentials to send real-time available seat alerts straight to your WhatsApp:</p>
+                            <ul>
+                                <li><strong>TWILIO_ACCOUNT_SID</strong> & <strong>TWILIO_AUTH_TOKEN</strong>: Found on the Twilio Console homepage dashboard.</li>
+                                <li><strong>TWILIO_FROM_NUMBER</strong>: The WhatsApp sender number (sandbox default is `whatsapp:+14155238886`).</li>
+                                <li><strong>MY_PHONE_NUMBER</strong>: Recipient WhatsApp phone number in country code format (e.g. `whatsapp:+919080014281`).</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="env-row">
+                            <div class="env-key">TWILIO_ACCOUNT_SID</div>
+                            <div class="env-val-container">
+                                <input type="text" id="env-twilio-sid" placeholder="ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">TWILIO_AUTH_TOKEN</div>
+                            <div class="env-val-container">
+                                <input type="password" id="env-twilio-token" placeholder="Enter Twilio Auth Token">
+                                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('env-twilio-token')">👁</button>
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">TWILIO_FROM_NUMBER</div>
+                            <div class="env-val-container">
+                                <input type="text" id="env-twilio-from" placeholder="whatsapp:+14155238886">
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">MY_PHONE_NUMBER</div>
+                            <div class="env-val-container">
+                                <input type="text" id="env-twilio-to" placeholder="whatsapp:+91XXXXXXXXXX">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scraper Operations Group -->
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Automation Settings</h4>
+                            <button class="help-toggle" onclick="toggleHelp('scraper-help')">ⓘ Setup Help</button>
+                        </div>
+                        <div id="scraper-help" class="help-content" style="display:none; margin-bottom: 10px;">
+                            <p>Global switches governing scraper speed and execution modes:</p>
+                            <ul>
+                                <li><strong>MONITOR_DELAY_SECONDS</strong>: Seconds to wait/sleep between scraping rounds (e.g. `5` or `30`).</li>
+                                <li><strong>REGISTER</strong>: Enable/Disable automatic registration enrollment when a slot matches your criteria.</li>
+                                <li><strong>MODIFY</strong>: Enable/Disable automatic course modification using Gmail OTP verification when a slot opens.</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="env-row">
+                            <div class="env-key">MONITOR_DELAY_SECONDS</div>
+                            <div class="env-val-container">
+                                <input type="number" id="env-monitor-delay" min="1">
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">REGISTER</div>
+                            <div class="env-val-container">
+                                <select id="env-register-enabled">
+                                    <option value="true">ENABLED (true)</option>
+                                    <option value="false">DISABLED (false)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">MODIFY</div>
+                            <div class="env-val-container">
+                                <select id="env-modify-enabled">
+                                    <option value="true">ENABLED (true)</option>
+                                    <option value="false">DISABLED (false)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="env-row">
+                            <div class="env-key">PRINT_TERMINAL_DATA</div>
+                            <div class="env-val-container">
+                                <select id="env-print-terminal">
+                                    <option value="true">ENABLED (true)</option>
+                                    <option value="false">DISABLED (false)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+                <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #0d1117;">
+                    <div style="color: var(--text-secondary); font-size: 11px;">
+                        Modifications are written directly to .env
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="closeEnvModal()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Cancel</button>
+                        <button onclick="saveEnvToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Save Settings</button>
                     </div>
                 </div>
             </div>
@@ -1975,6 +2282,87 @@ async def dashboard():
             countdown = REFRESH_INTERVAL / 1000;
         }}
 
+        window.openEnvModal = async function() {{
+            try {{
+                const res = await fetch('/api/env?t=' + Date.now());
+                const env = await res.json();
+                
+                document.getElementById('env-vtop-username').value = env.VTOP_USERNAME || '';
+                document.getElementById('env-vtop-password').value = env.VTOP_PASSWORD || '';
+                document.getElementById('env-gmail-address').value = env.GMAIL_ADDRESS || '';
+                document.getElementById('env-gmail-app-password').value = env.GMAIL_APP_PASSWORD || '';
+                
+                document.getElementById('env-twilio-sid').value = env.TWILIO_ACCOUNT_SID || '';
+                document.getElementById('env-twilio-token').value = env.TWILIO_AUTH_TOKEN || '';
+                document.getElementById('env-twilio-from').value = env.TWILIO_FROM_NUMBER || '';
+                document.getElementById('env-twilio-to').value = env.MY_PHONE_NUMBER || '';
+                
+                document.getElementById('env-monitor-delay').value = env.MONITOR_DELAY_SECONDS || '30';
+                document.getElementById('env-register-enabled').value = env.REGISTER || 'false';
+                document.getElementById('env-modify-enabled').value = env.MODIFY || 'false';
+                document.getElementById('env-print-terminal').value = env.print_scrapper_data_in_terminal || 'false';
+                
+                document.getElementById('env-modal').style.display = 'flex';
+            }} catch(e) {{
+                alert('Error loading environment config: ' + e);
+            }}
+        }};
+
+        window.closeEnvModal = function() {{
+            document.getElementById('env-modal').style.display = 'none';
+        }};
+
+        window.toggleHelp = function(id) {{
+            const el = document.getElementById(id);
+            if (el) {{
+                el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            }}
+        }};
+
+        window.togglePasswordVisibility = function(id) {{
+            const input = document.getElementById(id);
+            if (input) {{
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }}
+        }};
+
+        window.saveEnvToServer = async function() {{
+            const payload = {{
+                VTOP_USERNAME: document.getElementById('env-vtop-username').value.trim(),
+                VTOP_PASSWORD: document.getElementById('env-vtop-password').value.trim(),
+                GMAIL_ADDRESS: document.getElementById('env-gmail-address').value.trim(),
+                GMAIL_APP_PASSWORD: document.getElementById('env-gmail-app-password').value.trim(),
+                TWILIO_ACCOUNT_SID: document.getElementById('env-twilio-sid').value.trim(),
+                TWILIO_AUTH_TOKEN: document.getElementById('env-twilio-token').value.trim(),
+                TWILIO_FROM_NUMBER: document.getElementById('env-twilio-from').value.trim(),
+                MY_PHONE_NUMBER: document.getElementById('env-twilio-to').value.trim(),
+                MONITOR_DELAY_SECONDS: document.getElementById('env-monitor-delay').value.trim(),
+                REGISTER: document.getElementById('env-register-enabled').value,
+                MODIFY: document.getElementById('env-modify-enabled').value,
+                print_scrapper_data_in_terminal: document.getElementById('env-print-terminal').value
+            }};
+
+            try {{
+                const res = await fetch('/api/env', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json'
+                    }},
+                    body: JSON.stringify(payload)
+                }});
+                const resData = await res.json();
+                if (resData.status === 'success') {{
+                    alert('Environment configuration saved! The scraper will automatically reload settings on its next iteration cycle.');
+                    closeEnvModal();
+                    location.reload();
+                }} else {{
+                    alert('Failed to save settings: ' + resData.message);
+                }}
+            }} catch(e) {{
+                alert('Error saving environment configuration: ' + e);
+            }}
+        }};
+
         setInterval(() => {{
             countdown--;
             indicator.textContent = `⟳ Refreshing in ${{countdown}}s`;
@@ -1985,6 +2373,156 @@ async def dashboard():
     </html>
     """
     return html_content
+
+
+def read_env_file():
+    env_data = {}
+    env_path = ".env"
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.split("#", 1)[0].strip()  # remove inline comment
+                    env_data[k] = v
+    return env_data
+
+def update_env_file(updates: dict):
+    env_path = ".env"
+    if not os.path.exists(env_path):
+        with open(env_path, "w", encoding="utf-8") as f:
+            for k, v in updates.items():
+                f.write(f"{k}={v}\n")
+        return
+
+    with open(env_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    updated_keys = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            new_lines.append(line)
+            continue
+        
+        if "=" in line:
+            parts = line.split("=", 1)
+            key = parts[0].strip()
+            if key in updates:
+                val_part = parts[1]
+                comment = ""
+                if "#" in val_part:
+                    val_sub, comment_sub = val_part.split("#", 1)
+                    comment = "  # " + comment_sub.strip()
+                
+                new_value = updates[key]
+                new_lines.append(f"{key}={new_value}{comment}\n")
+                updated_keys.add(key)
+                continue
+        
+        new_lines.append(line)
+
+    for k, v in updates.items():
+        if k not in updated_keys:
+            new_lines.append(f"{k}={v}\n")
+
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+
+
+@app.get("/api/env")
+async def get_env_config():
+    from fastapi.responses import JSONResponse
+    env_file_data = read_env_file()
+    
+    keys_to_read = [
+        "VTOP_USERNAME", "VTOP_PASSWORD",
+        "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
+        "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
+    ]
+    
+    res = {}
+    for k in keys_to_read:
+        val = env_file_data.get(k)
+        if val is None:
+            if k == "TWILIO_FROM_NUMBER":
+                val = env_file_data.get("TWILIO_FROM_NUMBER", os.getenv("TWILIO_FROM_NUMBER", os.getenv("TWILIO_FROM", "")))
+            else:
+                val = os.getenv(k, "")
+        res[k] = val.strip() if val else ""
+        
+    return JSONResponse(res)
+
+
+@app.post("/api/env")
+async def save_env_config(request: Request):
+    global USERNAME, PASSWORD, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, MY_PHONE_NUMBER
+    global MONITOR_DELAY_SECONDS, REGISTER, MODIFY, PRINT_SCRAPER_DATA
+    from fastapi.responses import JSONResponse
+    try:
+        data = await request.json()
+        updates = {}
+        keys = [
+            "VTOP_USERNAME", "VTOP_PASSWORD",
+            "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD",
+            "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "MY_PHONE_NUMBER",
+            "MONITOR_DELAY_SECONDS", "REGISTER", "MODIFY", "print_scrapper_data_in_terminal"
+        ]
+        
+        for k in keys:
+            if k in data:
+                updates[k] = str(data[k]).strip()
+        
+        update_env_file(updates)
+        
+        if "VTOP_USERNAME" in updates:
+            USERNAME = updates["VTOP_USERNAME"]
+        if "VTOP_PASSWORD" in updates:
+            PASSWORD = updates["VTOP_PASSWORD"]
+        if "TWILIO_ACCOUNT_SID" in updates:
+            TWILIO_ACCOUNT_SID = updates["TWILIO_ACCOUNT_SID"]
+        if "TWILIO_AUTH_TOKEN" in updates:
+            TWILIO_AUTH_TOKEN = updates["TWILIO_AUTH_TOKEN"]
+        if "TWILIO_FROM_NUMBER" in updates:
+            TWILIO_FROM = updates["TWILIO_FROM_NUMBER"]
+        if "MY_PHONE_NUMBER" in updates:
+            MY_PHONE_NUMBER = updates["MY_PHONE_NUMBER"]
+            
+        if "MONITOR_DELAY_SECONDS" in updates:
+            try:
+                MONITOR_DELAY_SECONDS = int(updates["MONITOR_DELAY_SECONDS"])
+            except:
+                pass
+        if "REGISTER" in updates:
+            REGISTER = updates["REGISTER"].lower() == "true"
+        if "MODIFY" in updates:
+            MODIFY = updates["MODIFY"].lower() == "true"
+        if "print_scrapper_data_in_terminal" in updates:
+            PRINT_SCRAPER_DATA = updates["print_scrapper_data_in_terminal"].lower() == "true"
+            
+        for k, v in updates.items():
+            os.environ[k] = v
+            
+        try:
+            import src.fetch_otp
+            if "GMAIL_ADDRESS" in updates:
+                src.fetch_otp.GMAIL_ADDRESS = updates["GMAIL_ADDRESS"]
+            if "GMAIL_APP_PASSWORD" in updates:
+                src.fetch_otp.GMAIL_APP_PASSWORD = updates["GMAIL_APP_PASSWORD"]
+        except Exception as e:
+            print(f"Error updating fetch_otp module: {e}")
+            
+        print(f"[Config] Dynamic environment variables updated & written to .env")
+        return JSONResponse({"status": "success", "message": "Environment settings updated successfully!"})
+    except Exception as e:
+        print(f"Error saving environment config: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.get("/api/data")
