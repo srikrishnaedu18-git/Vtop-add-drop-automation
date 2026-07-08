@@ -1272,6 +1272,210 @@ async def dashboard():
             .pulse {{ animation: pulse 2s infinite; }}
             @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.4; }} }}
             code {{ background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
+
+            /* Pipeline Flow layout (AWS Glue/CodePipeline Style) */
+            .pipeline-container {{
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                overflow-x: auto;
+                padding: 20px 10px;
+                min-height: 180px;
+                scroll-behavior: smooth;
+            }}
+            .pipeline-card {{
+                flex: 0 0 240px;
+                background: rgba(22, 27, 34, 0.95);
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                padding: 15px;
+                position: relative;
+                cursor: grab;
+                transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+                user-select: none;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }}
+            .pipeline-card:hover {{
+                border-color: var(--accent-color);
+                transform: translateY(-3px);
+                box-shadow: 0 6px 16px rgba(88, 166, 255, 0.15);
+            }}
+            .pipeline-card:active {{
+                cursor: grabbing;
+            }}
+            .pipeline-card.dragging {{
+                opacity: 0.4;
+                border: 1px dashed var(--accent-color);
+                background: rgba(88, 166, 255, 0.05);
+            }}
+            .pipeline-card-header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 10px;
+            }}
+            .pipeline-step-badge {{
+                background: rgba(255,255,255,0.06);
+                border: 1px solid var(--border-color);
+                color: var(--text-secondary);
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 10px;
+                font-weight: 600;
+            }}
+            .pipeline-card-title {{
+                font-weight: 700;
+                font-size: 14px;
+                color: #fff;
+                margin-bottom: 8px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }}
+            .pipeline-card-details {{
+                font-size: 12px;
+                color: var(--text-secondary);
+                line-height: 1.5;
+            }}
+            .pipeline-card-details strong {{
+                color: var(--text-primary);
+            }}
+            .pipeline-badge-action {{
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 6px;
+                border-radius: 4px;
+                text-transform: uppercase;
+            }}
+            .badge-action-modify {{ background: rgba(188, 140, 255, 0.15); color: #bc8cff; border: 1px solid rgba(188, 140, 255, 0.3); }}
+            .badge-action-register {{ background: rgba(56, 139, 253, 0.15); color: #58a6ff; border: 1px solid rgba(56, 139, 253, 0.3); }}
+            .badge-action-monitor {{ background: rgba(139, 148, 158, 0.15); color: var(--text-secondary); border: 1px solid rgba(139, 148, 158, 0.3); }}
+
+            /* Connectors between pipeline cards */
+            .pipeline-arrow {{
+                flex: 0 0 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--border-color);
+                font-size: 20px;
+                font-weight: bold;
+                pointer-events: none;
+            }}
+            
+            /* Dotted Add Card */
+            .pipeline-add-card {{
+                flex: 0 0 240px;
+                border: 2px dashed var(--border-color);
+                border-radius: 10px;
+                background: transparent;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 130px;
+                color: var(--text-secondary);
+                cursor: pointer;
+                transition: 0.2s;
+            }}
+            .pipeline-add-card:hover {{
+                border-color: var(--accent-color);
+                color: var(--accent-color);
+                background: rgba(88, 166, 255, 0.03);
+            }}
+            .pipeline-add-icon {{
+                font-size: 32px;
+                margin-bottom: 8px;
+            }}
+            
+            /* Modal Overlay Background */
+            .modal-backdrop {{
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.75);
+                backdrop-filter: blur(4px);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: fadeIn 0.2s ease-out;
+            }}
+            .modal-content {{
+                background: #161b22;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                width: 90%;
+                max-width: 500px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                overflow: hidden;
+                animation: slideUp 0.2s ease-out;
+            }}
+            .modal-header {{
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            .modal-header h3 {{
+                margin: 0;
+                font-size: 16px;
+                font-weight: 600;
+            }}
+            .close-btn {{
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 24px;
+                cursor: pointer;
+                transition: color 0.2s;
+            }}
+            .close-btn:hover {{
+                color: #fff;
+            }}
+            .modal-body {{
+                padding: 20px;
+            }}
+            .form-group {{
+                margin-bottom: 16px;
+            }}
+            .form-group label {{
+                display: block;
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin-bottom: 6px;
+                font-weight: 500;
+            }}
+            .form-group input, .form-group select {{
+                width: 100%;
+                background: rgba(0,0,0,0.25);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                color: var(--text-primary);
+                padding: 10px 12px;
+                font-family: inherit;
+                font-size: 14px;
+                outline: none;
+                transition: border-color 0.2s;
+            }}
+            .form-group input:focus, .form-group select:focus {{
+                border-color: var(--accent-color);
+            }}
+            .form-group-row {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }}
+            .modal-footer {{
+                padding: 16px 20px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #0d1117;
+            }}
+            @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
+            @keyframes slideUp {{ from {{ transform: translateY(20px); }} to {{ transform: translateY(0); }} }}
         </style>
     </head>
     <body>
@@ -1306,28 +1510,13 @@ async def dashboard():
             </div>
 
             <div class="card" style="margin-bottom:30px;">
-                <h2>Monitor Settings (Course Configuration)</h2>
-                <div style="overflow-x: auto; margin-bottom: 15px;">
-                    <table id="config-table" style="min-width: 800px; margin-top:0;">
-                        <thead>
-                            <tr>
-                                <th>Subject Keyword</th>
-                                <th>Category</th>
-                                <th>Action</th>
-                                <th>Faculty Preference</th>
-                                <th>Slot Preference</th>
-                                <th>Page</th>
-                                <th style="width: 80px; text-align: center;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="config-tbody">
-                            <!-- Populated dynamically via JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button onclick="addConfigRow()" style="background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.25); color: #58a6ff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='rgba(88,166,255,0.18)'" onmouseout="this.style.background='rgba(88,166,255,0.1)'">+ Add New Subject</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <h2 style="margin:0; font-size: 16px; color: var(--text-secondary); font-weight: 500;">Monitor Settings (Course Pipeline Flow)</h2>
                     <button onclick="saveConfigToServer()" style="background: #238636; border: 1px solid #308f40; color: #fff; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s;" onmouseover="this.style.background='#2ea44f'" onmouseout="this.style.background='#238636'">Apply & Save Config</button>
+                </div>
+                
+                <div id="pipeline-container" class="pipeline-container">
+                    <!-- Populated dynamically via JS -->
                 </div>
             </div>
 
@@ -1366,6 +1555,62 @@ async def dashboard():
                 <h2>Live Console Logs (Terminal)</h2>
                 <div id="console-log-container" style="background: #000; color: #00ff00; font-family: monospace; font-size: 13px; padding: 15px; border-radius: 8px; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); line-height: 1.6; white-space: pre-wrap; word-break: break-all;">
                     <div style="color: #8b949e;">Waiting for console logs...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Popup for adding/editing courses -->
+        <div id="course-modal" class="modal-backdrop" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title">Edit Course Step</h3>
+                    <button onclick="closeModal()" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="modal-course-index">
+                    
+                    <div class="form-group">
+                        <label for="modal-keyword">Subject Keyword</label>
+                        <input type="text" id="modal-keyword" placeholder="e.g. Cyber Security">
+                    </div>
+                    
+                    <div class="form-group-row">
+                        <div class="form-group">
+                            <label for="modal-category">Category</label>
+                            <input type="text" id="modal-category" placeholder="DE, PC, UC...">
+                        </div>
+                        <div class="form-group">
+                            <label for="modal-page">Page Number</label>
+                            <input type="number" id="modal-page" min="1" value="1">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="modal-action">Target Action</label>
+                        <select id="modal-action">
+                            <option value="modify">Modify (with OTP)</option>
+                            <option value="register">Register (Add)</option>
+                            <option value="monitor">Monitor Only</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group-row">
+                        <div class="form-group">
+                            <label for="modal-faculty">Faculty Preference (Keyword)</label>
+                            <input type="text" id="modal-faculty" placeholder="e.g. PRABHU J (Optional)">
+                        </div>
+                        <div class="form-group">
+                            <label for="modal-slot">Slot Preference (Pattern)</label>
+                            <input type="text" id="modal-slot" placeholder="e.g. D1, D1+TD1 (Optional)">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal-delete-btn" onclick="deleteModalCourse()" style="background: rgba(218,54,55,0.15); border: 1px solid rgba(218,54,55,0.3); color: #ff6b6b; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Delete Step</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="closeModal()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Cancel</button>
+                        <button onclick="saveModalCourse()" style="background: #58a6ff; border: 1px solid #388bfd; color: #fff; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">Save Step</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1494,6 +1739,8 @@ async def dashboard():
             container.scrollTop = container.scrollHeight;
         }}
 
+        let dragSourceIndex = null;
+
         function render_config_table(courses) {{
             configCourses = courses || [];
             
@@ -1505,55 +1752,190 @@ async def dashboard():
                     : 'None';
             }}
             
-            const tbody = document.getElementById('config-tbody');
+            const container = document.getElementById('pipeline-container');
+            if (!container) return;
+            
             if (!configCourses.length) {{
-                tbody.innerHTML = "<tr><td colspan='7' style='text-align:center;color:var(--text-secondary)'>No subjects configured. Add one below.</td></tr>";
+                container.innerHTML = `
+                    <div class="pipeline-add-card" onclick="openAddModal()">
+                        <div class="pipeline-add-icon">+</div>
+                        <div>Add First Course</div>
+                    </div>
+                `;
                 return;
             }}
             
-            tbody.innerHTML = configCourses.map((c, idx) => `
-                <tr>
-                    <td><input type="text" value="${{c.keyword||''}}" onchange="updateConfigField(${{idx}}, 'keyword', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
-                    <td><input type="text" value="${{c.category||'DE'}}" onchange="updateConfigField(${{idx}}, 'category', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
-                    <td>
-                        <select onchange="updateConfigField(${{idx}}, 'action', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;">
-                            <option value="modify" ${{c.action === 'modify' ? 'selected' : ''}}>Modify</option>
-                            <option value="register" ${{c.action === 'register' ? 'selected' : ''}}>Register</option>
-                            <option value="monitor" ${{c.action === 'monitor' ? 'selected' : ''}}>Monitor Only</option>
-                        </select>
-                    </td>
-                    <td><input type="text" value="${{c.target_faculty||''}}" placeholder="Any" onchange="updateConfigField(${{idx}}, 'target_faculty', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
-                    <td><input type="text" value="${{c.target_slot||''}}" placeholder="Any" onchange="updateConfigField(${{idx}}, 'target_slot', this.value)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
-                    <td><input type="number" value="${{c.page||1}}" onchange="updateConfigField(${{idx}}, 'page', parseInt(this.value)||1)" style="background:rgba(0,0,0,0.25); border:1px solid var(--border-color); color:var(--text-primary); padding:6px 8px; border-radius:4px; font-size:13px; font-family:inherit; width:95%;"></td>
-                    <td style="text-align: center;">
-                        <button onclick="deleteConfigRow(${{idx}})" style="background:rgba(218,54,55,0.15); border:1px solid rgba(218,54,55,0.3); color:#ff6b6b; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; transition:0.2s;" onmouseover="this.style.background='rgba(218,54,55,0.25)'" onmouseout="this.style.background='rgba(218,54,55,0.15)'">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        }}
-
-        window.updateConfigField = function(idx, field, val) {{
-            if (configCourses[idx]) {{
-                configCourses[idx][field] = val;
-            }}
-        }}
-
-        window.addConfigRow = function() {{
-            configCourses.push({{
-                keyword: "",
-                category: "DE",
-                action: "modify",
-                target_faculty: "",
-                target_slot: "",
-                page: 1
+            let html = '';
+            configCourses.forEach((c, idx) => {{
+                const actionBadgeClass = 'badge-action-' + (c.action || 'monitor');
+                const actionLabel = c.action === 'modify' ? 'Modify' : c.action === 'register' ? 'Register' : 'Monitor Only';
+                
+                html += `
+                    <div class="pipeline-card" 
+                         draggable="true" 
+                         data-index="${{idx}}"
+                         onclick="openEditModal(${{idx}})"
+                         ondragstart="handleDragStart(event, ${{idx}})"
+                         ondragover="handleDragOver(event)"
+                         ondragenter="handleDragEnter(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event, ${{idx}})"
+                         ondragend="handleDragEnd(event)">
+                        <div class="pipeline-card-header">
+                            <span class="pipeline-step-badge">STEP ${{idx + 1}}</span>
+                            <span class="pipeline-badge-action ${{actionBadgeClass}}">${{actionLabel}}</span>
+                        </div>
+                        <div class="pipeline-card-title">${{c.keyword || 'Unnamed Course'}}</div>
+                        <div class="pipeline-card-details">
+                            <strong>Category:</strong> ${{c.category || 'DE'}} (Page ${{c.page || 1}})<br>
+                            <strong>Faculty:</strong> ${{c.target_faculty || 'Any'}}<br>
+                            <strong>Slot:</strong> ${{c.target_slot || 'Any'}}
+                        </div>
+                    </div>
+                `;
+                
+                // Connection arrow to next card
+                html += `<div class="pipeline-arrow">&rarr;</div>`;
             }});
-            render_config_table(configCourses);
+            
+            // Final Add Step Card at the end of the train
+            html += `
+                <div class="pipeline-add-card" onclick="openAddModal()">
+                    <div class="pipeline-add-icon">+</div>
+                    <div>Add Course Step</div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
         }}
 
-        window.deleteConfigRow = function(idx) {{
-            configCourses.splice(idx, 1);
+        // Drag and Drop Event Handlers
+        window.handleDragStart = function(e, idx) {{
+            dragSourceIndex = idx;
+            e.currentTarget.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', idx);
+        }};
+
+        window.handleDragOver = function(e) {{
+            if (e.preventDefault) {{
+                e.preventDefault(); // Necessary. Allows us to drop.
+            }}
+            return false;
+        }};
+
+        window.handleDragEnter = function(e) {{
+            e.currentTarget.style.borderColor = 'var(--accent-color)';
+            e.currentTarget.style.background = 'rgba(88, 166, 255, 0.05)';
+        }};
+
+        window.handleDragLeave = function(e) {{
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.background = 'rgba(22, 27, 34, 0.95)';
+        }};
+
+        window.handleDrop = function(e, targetIdx) {{
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (dragSourceIndex !== null && dragSourceIndex !== targetIdx) {{
+                // Rearrange the items in configCourses array
+                const draggedItem = configCourses[dragSourceIndex];
+                configCourses.splice(dragSourceIndex, 1);
+                configCourses.splice(targetIdx, 0, draggedItem);
+                
+                // Re-render
+                render_config_table(configCourses);
+            }}
+            return false;
+        }};
+
+        window.handleDragEnd = function(e) {{
+            e.currentTarget.classList.remove('dragging');
+            // Reset styles on all cards
+            const cards = document.querySelectorAll('.pipeline-card');
+            cards.forEach(c => {{
+                c.style.borderColor = 'var(--border-color)';
+                c.style.background = 'rgba(22, 27, 34, 0.95)';
+            }});
+            dragSourceIndex = null;
+        }};
+
+        // Modal Open / Close / Save logic
+        window.openEditModal = function(idx) {{
+            const course = configCourses[idx];
+            if (!course) return;
+            
+            // Prevent modal click from triggering if we are dragging
+            if (dragSourceIndex !== null) return;
+            
+            document.getElementById('modal-title').textContent = `Edit Step ${idx + 1}`;
+            document.getElementById('modal-course-index').value = idx;
+            document.getElementById('modal-keyword').value = course.keyword || '';
+            document.getElementById('modal-category').value = course.category || 'DE';
+            document.getElementById('modal-page').value = course.page || 1;
+            document.getElementById('modal-action').value = course.action || 'modify';
+            document.getElementById('modal-faculty').value = course.target_faculty || '';
+            document.getElementById('modal-slot').value = course.target_slot || '';
+            
+            document.getElementById('modal-delete-btn').style.display = 'block';
+            document.getElementById('course-modal').style.display = 'flex';
+        }};
+
+        window.openAddModal = function() {{
+            document.getElementById('modal-title').textContent = 'Add New Pipeline Step';
+            document.getElementById('modal-course-index').value = '-1';
+            document.getElementById('modal-keyword').value = '';
+            document.getElementById('modal-category').value = 'DE';
+            document.getElementById('modal-page').value = 1;
+            document.getElementById('modal-action').value = 'modify';
+            document.getElementById('modal-faculty').value = '';
+            document.getElementById('modal-slot').value = '';
+            
+            document.getElementById('modal-delete-btn').style.display = 'none';
+            document.getElementById('course-modal').style.display = 'flex';
+        }};
+
+        window.closeModal = function() {{
+            document.getElementById('course-modal').style.display = 'none';
+        }};
+
+        window.saveModalCourse = function() {{
+            const idx = parseInt(document.getElementById('modal-course-index').value);
+            const courseData = {{
+                keyword: document.getElementById('modal-keyword').value.trim(),
+                category: document.getElementById('modal-category').value.trim() || 'DE',
+                page: parseInt(document.getElementById('modal-page').value) || 1,
+                action: document.getElementById('modal-action').value,
+                target_faculty: document.getElementById('modal-faculty').value.trim(),
+                target_slot: document.getElementById('modal-slot').value.trim()
+            }};
+            
+            if (!courseData.keyword) {{
+                alert('Please enter a Subject Keyword.');
+                return;
+            }}
+            
+            if (idx === -1) {{
+                // Add new course to end of array
+                configCourses.push(courseData);
+            }} else {{
+                // Update existing
+                configCourses[idx] = courseData;
+            }}
+            
             render_config_table(configCourses);
-        }}
+            closeModal();
+        }};
+
+        window.deleteModalCourse = function() {{
+            const idx = parseInt(document.getElementById('modal-course-index').value);
+            if (idx >= 0 && idx < configCourses.length) {{
+                configCourses.splice(idx, 1);
+                render_config_table(configCourses);
+            }}
+            closeModal();
+        }};
 
         window.saveConfigToServer = async function() {{
             try {{
