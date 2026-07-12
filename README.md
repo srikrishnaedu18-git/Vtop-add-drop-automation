@@ -120,7 +120,7 @@ Create a `.env` file in the root directory based on `.env.example`:
 | `TWILIO_ACCOUNT_SID` | Twilio Account SID for sending notifications. | `AC••••••••••••••••` |
 | `TWILIO_AUTH_TOKEN` | Twilio API Auth Token. | `••••••••••••••••` |
 | `TWILIO_FROM_NUMBER` | Sandbox Twilio WhatsApp sender number. | `whatsapp:+14155238886` |
-| `MY_PHONE_NUMBER` | Your personal WhatsApp receiver number. | `whatsapp:+919080014281` |
+| `MY_PHONE_NUMBER` | Your personal WhatsApp receiver number. | `whatsapp:+919090090900` |
 | `BLUR` | Enable Privacy/Anonymization mode. | `false` |
 | `print_scrapper_data_in_terminal` | Print full stdout debug lines for scraped seats. | `true` |
 
